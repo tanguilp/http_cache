@@ -8,10 +8,12 @@
       grace := http_cache:timestamp(),
       ttl_set_by := header | heuristics,
       parsed_headers := #{binary() => term()}}.
--type body() ::
-    binary().% The body transmitted to the backend is a binary so as to optimize copying around
+-type body() :: binary().
+
+             % The body transmitted to the backend is a binary so as to optimize copying around
              % data: an IOlist would have to be copied whereas (big) binaries are simply
              % reference-counted.
+
 %TODO: use {http_cache:response(), response_metadata()}
 -type response() ::
     {Status :: http_cache:status(),

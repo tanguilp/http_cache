@@ -177,6 +177,8 @@
 %%
 %% `{error, term()}' is returned by the backend in case of error.
 
+-define(TELEMETRY_COMPRESS_EVENT, [http_cache, compress_operation]).
+-define(TELEMETRY_UNCOMPRESS_EVENT, [http_cache, uncompress_operation]).
 -define(DEFAULT_TTL, 2 * 60).
 -define(DEFAULT_GRACE, 2 * 60).
 -define(DEFAULT_COMPRESS_MIME_TYPES,
@@ -436,7 +438,8 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
     ParsedRespHeaders =
         maps:merge(ParsedRespHeaders0,
                    parse_headers(RespHeaders, [<<"content-encoding">>, <<"vary">>])),
-    GzippedBody = zlib:gzip(RespBody),
+    {GzipDur, GzippedBody} = timer:tc(zlib, gzip, [RespBody]),
+    telemetry:execute(?TELEMETRY_COMPRESS_EVENT, #{duration => GzipDur}, #{alg => gzip}),
     do_cache({Method, Url, ReqHeaders, ReqBody},
              ParsedReqHeaders,
              {Status, RespHeaders, GzippedBody},
@@ -1052,7 +1055,8 @@ handle_auto_decompress(ParsedReqHeaders,
          andalso % no decompressing of responses with strong validator
                  (not is_map_key(<<"etag">>, ParsedRespHeaders)
                   orelse element(1, map_get(<<"etag">>, ParsedRespHeaders)) == weak) ->
-    DecompressedBody = zlib:gunzip(Body),
+    {GunzipDur, DecompressedBody} = timer:tc(zlib, gunzip, [Body]),
+    telemetry:execute(?TELEMETRY_UNCOMPRESS_EVENT, #{duration => GunzipDur}, #{alg => gzip}),
     {Status,
      delete_header(<<"content-encoding">>,
                    set_header_value(<<"content-length">>,
