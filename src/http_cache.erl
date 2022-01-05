@@ -560,7 +560,8 @@ invalidate_url(Url, Opts) ->
 
 do_invalidate_url(Url, #{store := Store} = Opts) ->
     UrlDigest = url_digest(Url, Opts),
-    log_invalidation_result(Store:invalidate_url(UrlDigest), url).
+    {InvalidationDur, InvalidationRes} = timer:tc(Store, invalidate_url, [UrlDigest]),
+    log_invalidation_result(InvalidationRes, url, InvalidationDur).
 
 %%------------------------------------------------------------------------------
 %% @doc Invalidates all responses stored with the alternate key
@@ -574,7 +575,9 @@ invalidate_by_alternate_key(AltKeys, Opts) ->
 do_invalidate_by_alternate_key([], _Opts) ->
     {ok, 0};
 do_invalidate_by_alternate_key([_ | _] = AltKeys, #{store := Store}) ->
-    log_invalidation_result(Store:invalidate_by_alternate_key(AltKeys), alternate_key);
+    {InvalidationDur, InvalidationRes} =
+        timer:tc(Store, invalidate_by_alternate_key, [AltKeys]),
+    log_invalidation_result(InvalidationRes, alternate_key, InvalidationDur);
 do_invalidate_by_alternate_key(AltKey, #{store := _} = Opts) ->
     do_invalidate_by_alternate_key([AltKey], Opts).
 
@@ -1459,15 +1462,18 @@ parsed_content_type_to_string({MainType, SubType, Params}) ->
         iolist_to_binary([<<"; ", Name/binary, "=", Value/binary>> || {Name, Value} <- Params]),
     <<MainType/binary, "/", SubType/binary, JoinedParams/binary>>.
 
-log_invalidation_result({ok, NbInvalidation}, Type) when is_integer(NbInvalidation) ->
+log_invalidation_result({ok, NbInvalidation}, Type, InvalidationDur)
+    when is_integer(NbInvalidation) ->
     telemetry:execute(?TELEMETRY_INVALIDATION_EVT,
-                      #{count => NbInvalidation},
+                      #{count => NbInvalidation, duration => InvalidationDur},
                       #{type => Type}),
     {ok, NbInvalidation};
-log_invalidation_result({ok, undefined}, Type) ->
-    telemetry:execute(?TELEMETRY_INVALIDATION_EVT, #{count => 1}, #{type => Type}),
+log_invalidation_result({ok, undefined}, Type, InvalidationDur) ->
+    telemetry:execute(?TELEMETRY_INVALIDATION_EVT,
+                      #{count => 1, duration => InvalidationDur},
+                      #{type => Type}),
     {ok, undefined};
-log_invalidation_result(Error, _Type) ->
+log_invalidation_result(Error, _Type, _InvlidationDur) ->
     Error.
 
 unix_now() ->
