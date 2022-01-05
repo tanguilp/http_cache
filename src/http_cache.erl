@@ -545,7 +545,7 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
     {TransformedResponse, TransformMeasurements} =
         transform_response(Request, ParsedReqHeaders, Response, RespMetadata, Opts),
     AllMeasurements =
-        maps:merge(#{total_time => now_monotonic_us() - StartTime, store_time => StoreDur},
+        maps:merge(#{total_time => now_monotonic_us() - StartTime, store_save_time => StoreDur},
                    maps:merge(Measurements, TransformMeasurements)),
     telemetry:execute(?TELEMETRY_CACHE_EVT, AllMeasurements, #{cacheable => true}),
     {ok, TransformedResponse}.
