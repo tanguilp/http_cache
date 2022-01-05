@@ -1,8 +1,7 @@
 -module(http_cache).
 
 %% API exports
--export([get/2, notify_use/2, cache/3, invalidate_url/2, invalidate_by_alternate_key/2,
-         parse_headers/2]).
+-export([get/2, notify_use/2, cache/3, invalidate_url/2, invalidate_by_alternate_key/2]).
 
 -export_type([alternate_key/0, headers/0, request_key/0, response/0, status/0,
               timestamp/0, vary_headers/0]).
@@ -72,7 +71,7 @@
 %%    Used by {@link get/2}.  Defaults to `false'.
 %%  </li>
 %%  <li>
-%%    `auto_compress': automatically compresses uncompressed text responses with gzip.
+%%    `auto_compress': automatically compresses decompressed text responses with gzip.
 %%    This can help with reducing the size of stored content. Moreover, most browsers
 %%    do support gzip encoding.
 %%
@@ -177,8 +176,6 @@
 %%
 %% `{error, term()}' is returned by the backend in case of error.
 
--define(TELEMETRY_COMPRESS_EVENT, [http_cache, compress_operation]).
--define(TELEMETRY_UNCOMPRESS_EVENT, [http_cache, uncompress_operation]).
 -define(DEFAULT_TTL, 2 * 60).
 -define(DEFAULT_GRACE, 2 * 60).
 -define(DEFAULT_COMPRESS_MIME_TYPES,
@@ -221,6 +218,11 @@
           ignore_query_params_order => false,
           max_ranges => 100,
           type => shared}).
+-define(TELEMETRY_LOOKUP_EVT, [http_cache, lookup]).
+-define(TELEMETRY_CACHE_EVT, [http_cache, cache]).
+-define(TELEMETRY_INVALIDATION_EVT, [http_cache, invalidation]).
+-define(TELEMETRY_COMPRESS_EVT, [http_cache, compress_operation]).
+-define(TELEMETRY_DECOMPRESS_EVT, [http_cache, decompress_operation]).
 
 %%====================================================================
 %% API functions
@@ -277,13 +279,15 @@
              {must_revalidate, {response_ref(), response()}} |
              undefined.
   %TODO: response ref probably unnecessary
+  %TODO: rename rfreshness to fresh | stale | must_revalidate | miss
 
 get(Request, Opts) ->
     do_get(Request, normalize_opts(Opts)).
 
 do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts) ->
+    StartTime = now_monotonic_us(),
     RequestKey = request_key(Request, Opts),
-    Candidates = Store:list_candidates(RequestKey),
+    {StoreLookupDur, Candidates} = timer:tc(Store, list_candidates, [RequestKey]),
     ParsedReqHeaders =
         parse_headers(ReqHeaders,
                       [<<"cache-control">>,
@@ -293,7 +297,15 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
                        <<"if-none-match">>,
                        <<"if-modified-since">>,
                        <<"if-range">>]),
-    case select_candidate(ReqHeaders, ParsedReqHeaders, Candidates, undefined, Opts) of
+    {CandidateSelectionDur, MaybeCandidate} =
+        timer:tc(fun() ->
+                    select_candidate(ReqHeaders, ParsedReqHeaders, Candidates, undefined, Opts)
+                 end),
+    Measurements =
+        #{store_lookup_time => StoreLookupDur,
+          response_selection_time => CandidateSelectionDur,
+          candidate_count => length(Candidates)},
+    case MaybeCandidate of
         {Freshness, {RespRef, _Status, _RespHeaders, _VaryHeaders, _RespMetadata}} ->
             case Store:get_response(RespRef) of
                 {Status, RespHeaders, _, _} = Response ->
@@ -304,6 +316,8 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
                                                  ParsedReqHeaders,
                                                  RespRef,
                                                  Response,
+                                                 StartTime,
+                                                 Measurements,
                                                  Opts);
                         stale ->
                             postprocess_response(stale,
@@ -311,14 +325,24 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
                                                  ParsedReqHeaders,
                                                  RespRef,
                                                  Response,
+                                                 StartTime,
+                                                 Measurements,
                                                  Opts);
                         must_revalidate ->
+                            telemetry:execute(?TELEMETRY_LOOKUP_EVT,
+                                              maps:put(total_time,
+                                                       now_monotonic_us() - StartTime,
+                                                       Measurements),
+                                              #{freshness => must_revalidate}),
                             {must_revalidate, {RespRef, {Status, RespHeaders, undefined}}}
                     end;
                 undefined ->
                     throw(resp_body_not_accessible)
             end;
         undefined ->
+            telemetry:execute(?TELEMETRY_LOOKUP_EVT,
+                              maps:put(total_time, now_monotonic_us() - StartTime, Measurements),
+                              #{freshness => undefined}),
             undefined
     end.
 
@@ -327,22 +351,38 @@ postprocess_response(Freshness,
                      ParsedReqHeaders,
                      RespRef,
                      {Status, RespHeaders, Body, RespMetadata},
+                     StartTime,
+                     Measurements,
                      Opts) ->
     Response0 = {Status, RespHeaders, Body},
     case handle_conditions(Request, ParsedReqHeaders, Response0, RespMetadata) of
         {304, _, _} = Response1 ->
+            telemetry:execute(?TELEMETRY_LOOKUP_EVT,
+                              maps:put(total_time, now_monotonic_us() - StartTime, Measurements),
+                              #{freshness => Freshness}),
             {Freshness, {RespRef, Response1}};
         Response1 ->
             Response2 = set_cached_resp_headers(Response1, RespMetadata),
-            Response3 =
+            {Response3, TransformMeasurements} =
                 transform_response(Request, ParsedReqHeaders, Response2, RespMetadata, Opts),
             Response4 = handle_file_body(Response3),
+            telemetry:execute(?TELEMETRY_LOOKUP_EVT,
+                              maps:put(total_time,
+                                       now_monotonic_us() - StartTime,
+                                       maps:merge(Measurements, TransformMeasurements)),
+                              #{freshness => Freshness}),
             {Freshness, {RespRef, Response4}}
     end.
 
 transform_response(Request, ParsedReqHeaders, Response0, RespMetadata, Opts) ->
-    Response1 = handle_auto_decompress(ParsedReqHeaders, Response0, RespMetadata, Opts),
-    handle_range_request(Request, ParsedReqHeaders, Response1, RespMetadata, Opts).
+    {DecompressDur, Response1} =
+        timer:tc(fun() -> handle_auto_decompress(ParsedReqHeaders, Response0, RespMetadata, Opts)
+                 end),
+    {RangeDur, Response2} =
+        timer:tc(fun() ->
+                    handle_range_request(Request, ParsedReqHeaders, Response1, RespMetadata, Opts)
+                 end),
+    {Response2, #{decompress_time => DecompressDur, range_time => RangeDur}}.
 
 %%------------------------------------------------------------------------------
 %% @doc Notifies the backend that a response was used
@@ -387,6 +427,7 @@ cache(Request, Response, Opts) ->
 analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
               {Status, RespHeaders, _RespBody} = Response,
               Opts) ->
+    StartTime = now_monotonic_us(),
     ParsedRespHeaders =
         parse_headers(RespHeaders,
                       [<<"age">>,
@@ -402,6 +443,9 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
     case must_invalidate_request_uri(Request, Response, ParsedRespHeaders) of
         true ->
             handle_invalidation_of_unsafe_method(Request, RespHeaders, Opts),
+            telemetry:execute(?TELEMETRY_CACHE_EVT,
+                              #{total_time => now_monotonic_us() - StartTime},
+                              #{cacheable => false}),
             not_cacheable;
         false ->
             ParsedReqHeaders =
@@ -409,8 +453,17 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
 
             case is_cacheable(Method, ParsedReqHeaders, Status, ParsedRespHeaders, Opts) of
                 true ->
-                    do_cache(Request, ParsedReqHeaders, Response, ParsedRespHeaders, Opts);
+                    do_cache(Request,
+                             ParsedReqHeaders,
+                             Response,
+                             ParsedRespHeaders,
+                             StartTime,
+                             #{analysis_time => now_monotonic_us() - StartTime},
+                             Opts);
                 false ->
+                    telemetry:execute(?TELEMETRY_CACHE_EVT,
+                                      #{total_time => now_monotonic_us() - StartTime},
+                                      #{cacheable => false}),
                     not_cacheable
             end
     end.
@@ -419,6 +472,8 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
          ParsedReqHeaders0,
          {Status, RespHeaders0, RespBody},
          #{<<"content-type">> := {MainType, SubType, _}} = ParsedRespHeaders0,
+         StartTime,
+         Measurements,
          #{auto_compress := true} = Opts)
     when not is_map_key(<<"content-encoding">>, ParsedRespHeaders0)
          andalso is_map_key({MainType, SubType}, ?DEFAULT_COMPRESS_MIME_TYPES)
@@ -439,16 +494,20 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
         maps:merge(ParsedRespHeaders0,
                    parse_headers(RespHeaders, [<<"content-encoding">>, <<"vary">>])),
     {GzipDur, GzippedBody} = timer:tc(zlib, gzip, [RespBody]),
-    telemetry:execute(?TELEMETRY_COMPRESS_EVENT, #{duration => GzipDur}, #{alg => gzip}),
+    telemetry:execute(?TELEMETRY_COMPRESS_EVT, #{duration => GzipDur}, #{alg => gzip}),
     do_cache({Method, Url, ReqHeaders, ReqBody},
              ParsedReqHeaders,
              {Status, RespHeaders, GzippedBody},
              ParsedRespHeaders,
+             StartTime,
+             maps:put(compress_time, GzipDur, Measurements),
              Opts);
 do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
          ParsedReqHeaders,
          {Status, RespHeaders0, RespBody0},
          ParsedRespHeaders,
+         StartTime,
+         Measurements,
          #{store := Store} = Opts) ->
     RespBodyBin = iolist_to_binary(RespBody0),
     % the response doesn't necessarily has the content length set, but we have this
@@ -472,15 +531,24 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
           %TODO: keep only those which are really needed
           parsed_headers => ParsedRespHeaders},
     AlternateKeys = map_get(alternate_keys, Opts),
-    case Store:put(RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata, AlternateKeys)
-    of
+    {StoreDur, StoreRes} =
+        timer:tc(Store,
+                 put,
+                 [RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata, AlternateKeys]),
+    case StoreRes of
         %TODO: logging
         ok ->
             ok;
         {error, _Reason} ->
             ok
     end,
-    {ok, transform_response(Request, ParsedReqHeaders, Response, RespMetadata, Opts)}.
+    {TransformedResponse, TransformMeasurements} =
+        transform_response(Request, ParsedReqHeaders, Response, RespMetadata, Opts),
+    AllMeasurements =
+        maps:merge(#{total_time => now_monotonic_us() - StartTime, store_time => StoreDur},
+                   maps:merge(Measurements, TransformMeasurements)),
+    telemetry:execute(?TELEMETRY_CACHE_EVT, AllMeasurements, #{cacheable => true}),
+    {ok, TransformedResponse}.
 
 %%------------------------------------------------------------------------------
 %% @doc Invalidates all responses for a URL
@@ -492,7 +560,7 @@ invalidate_url(Url, Opts) ->
 
 do_invalidate_url(Url, #{store := Store} = Opts) ->
     UrlDigest = url_digest(Url, Opts),
-    Store:invalidate_url(UrlDigest).
+    log_invalidation_result(Store:invalidate_url(UrlDigest), url).
 
 %%------------------------------------------------------------------------------
 %% @doc Invalidates all responses stored with the alternate key
@@ -506,7 +574,7 @@ invalidate_by_alternate_key(AltKeys, Opts) ->
 do_invalidate_by_alternate_key([], _Opts) ->
     {ok, 0};
 do_invalidate_by_alternate_key([_ | _] = AltKeys, #{store := Store}) ->
-    Store:invalidate_by_alternate_key(AltKeys);
+    log_invalidation_result(Store:invalidate_by_alternate_key(AltKeys), alternate_key);
 do_invalidate_by_alternate_key(AltKey, #{store := _} = Opts) ->
     do_invalidate_by_alternate_key([AltKey], Opts).
 
@@ -1043,9 +1111,6 @@ grace(Expires, #{default_grace := Grace}) ->
 cache_type(#{type := Type}) ->
     Type.
 
-unix_now() ->
-    os:system_time(second).
-
 handle_auto_decompress(ParsedReqHeaders,
                        {Status, RespHeaders, Body},
                        #{parsed_headers :=
@@ -1056,7 +1121,7 @@ handle_auto_decompress(ParsedReqHeaders,
                  (not is_map_key(<<"etag">>, ParsedRespHeaders)
                   orelse element(1, map_get(<<"etag">>, ParsedRespHeaders)) == weak) ->
     {GunzipDur, DecompressedBody} = timer:tc(zlib, gunzip, [Body]),
-    telemetry:execute(?TELEMETRY_UNCOMPRESS_EVENT, #{duration => GunzipDur}, #{alg => gzip}),
+    telemetry:execute(?TELEMETRY_DECOMPRESS_EVT, #{duration => GunzipDur}, #{alg => gzip}),
     {Status,
      delete_header(<<"content-encoding">>,
                    set_header_value(<<"content-length">>,
@@ -1393,3 +1458,20 @@ parsed_content_type_to_string({MainType, SubType, Params}) ->
     JoinedParams =
         iolist_to_binary([<<"; ", Name/binary, "=", Value/binary>> || {Name, Value} <- Params]),
     <<MainType/binary, "/", SubType/binary, JoinedParams/binary>>.
+
+log_invalidation_result({ok, NbInvalidation}, Type) when is_integer(NbInvalidation) ->
+    telemetry:execute(?TELEMETRY_INVALIDATION_EVT,
+                      #{count => NbInvalidation},
+                      #{type => Type}),
+    {ok, NbInvalidation};
+log_invalidation_result({ok, undefined}, Type) ->
+    telemetry:execute(?TELEMETRY_INVALIDATION_EVT, #{count => 1}, #{type => Type}),
+    {ok, undefined};
+log_invalidation_result(Error, _Type) ->
+    Error.
+
+unix_now() ->
+    os:system_time(second).
+
+now_monotonic_us() ->
+    erlang:monotonic_time(microsecond).

@@ -16,7 +16,7 @@
 
 http_cache_test_() ->
     {foreach,
-     fun test_opts/0,
+     fun init/0,
      [fun opt_allow_stale_while_revalidate/1, fun opt_allow_stale_if_error_req_header/1,
       fun opt_allow_stale_if_error_resp_header/1, fun opt_auto_accept_encoding/1,
       fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
@@ -1818,7 +1818,8 @@ rfc7233_no_satisfiable_range_content_range_header(Opts) ->
         end,
     {spawn, ?_assertEqual(<<"bytes */12">>, begin F() end)}.
 
-test_opts() ->
+init() ->
+    application:ensure_all_started(telemetry),
     [{default_ttl, 10},
      {default_grace, 10},
      {store, http_cache_store_process},
