@@ -168,6 +168,9 @@
     {store, module()} |
     {type, type()} |
     {request_time, non_neg_integer()}.
+
+    %TODO: rename to origin_unreachable
+
 -type invalidation_result() ::
     {ok, NbInvalidation :: non_neg_integer() | undefined} | {error, term()}.
 

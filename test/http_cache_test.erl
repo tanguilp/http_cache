@@ -28,7 +28,7 @@ http_cache_test_() ->
       fun rfc7234_section_3_resp_has_maxage_ccdir/1,
       fun rfc7234_section_3_resp_has_smaxage_ccdir/1,
       fun rfc7234_section_3_resp_has_public_ccdir/1,
-      fun rfc7234_section_3_1_range_request_unsupported/1,
+      fun rfc7234_section_3_1_range_response_not_cached/1,
       fun rfc7234_section_3_2_authorization_header_caching/1,
       %fun rfc7234_section_4_head_of_get/1,
       fun rfc7234_section_4_req_nocache_ccdir/1,
@@ -38,10 +38,8 @@ http_cache_test_() ->
       fun rfc7234_section_4_2_stale_on_expired/1, fun rfc7234_section_4_2_1_smaxage_shared/1,
       fun rfc7234_section_4_2_1_smaxage_private/1, fun rfc7234_section_4_2_1_maxage/1,
       fun rfc7234_section_4_2_1_expires/1, fun rfc7234_section_4_2_2_heuristics_no_used/1,
-      fun rfc7234_section_4_2_2_113_warning_generated/1,
       fun rfc7234_section_4_2_3_age_no_date_header/1,
       fun rfc7234_section_4_2_3_age_with_date_header/1,
-      fun rfc7234_section_4_2_4_stale_response_warning_generated/1,
       fun rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_cache/1,
       fun rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_store/1,
       fun rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate/1,
@@ -63,6 +61,10 @@ http_cache_test_() ->
       fun rfc7234_section_5_2_1_3_ccdir_min_fresh/1,
       fun rfc7234_section_5_2_1_4_ccdir_no_cache/1,
       fun rfc7234_section_5_2_1_5_ccdir_no_store/1,
+      fun rfc7234_section_5_2_1_6_ccdir_no_transform_auto_compress/1,
+      fun rfc7234_section_5_2_1_6_ccdir_no_transform_auto_decompress/1,
+      fun rfc7234_section_5_2_1_6_ccdir_no_transform_range/1,
+      fun rfc7234_section_5_2_1_7_ccdir_only_if_cached/1,
       fun rfc7234_section_5_2_2_1_ccdir_must_revalidate/1,
       fun rfc7234_section_5_2_2_2_ccdir_no_cache/1,
       fun rfc7234_section_5_2_2_3_ccdir_no_store/1, fun rfc7234_section_5_2_2_5_ccdir_public/1,
@@ -71,6 +73,11 @@ http_cache_test_() ->
       fun rfc7234_section_5_2_2_8_ccdir_max_age/1, fun rfc7234_section_5_2_2_9_ccdir_s_maxage/1,
       fun rfc7234_section_5_3_header_expires_malformed/1,
       fun rfc7234_section_5_3_header_expires/1, fun rfc7234_section_5_4_header_pragma/1,
+      fun rfc7234_section_5_5_1_response_is_stale/1,
+      fun rfc7234_section_5_5_2_warning_revalidation_failed/1,
+      fun rfc7234_section_5_5_4_warning_heuristics_expiration/1,
+      fun rfc7234_section_5_5_6_plain_compressed/1,
+      fun rfc7234_section_5_5_6_already_compressed/1,
       fun rfc5861_stale_while_revalidate_not_expired/1,
       fun rfc5861_stale_while_revalidate_expired/1,
       fun rfc5861_stale_if_error_req_not_expired/1, fun rfc5861_stale_if_error_req_expired/1,
@@ -523,7 +530,7 @@ rfc7234_section_3_resp_has_public_ccdir(Opts) ->
                                     Opts))
      || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES].
 
-rfc7234_section_3_1_range_request_unsupported(Opts) ->
+rfc7234_section_3_1_range_response_not_cached(Opts) ->
     [?_assertMatch(not_cacheable,
                    http_cache:cache({Method, <<"https://example.com">>, [], <<"">>},
                                     {206,
@@ -889,20 +896,6 @@ rfc7234_section_4_2_2_heuristics_no_used(Opts) ->
         end,
     {spawn, ?_assertNotEqual(unix_now() + TTL, F())}.
 
-rfc7234_section_4_2_2_113_warning_generated(Opts) ->
-    F = fun() ->
-           TwoDays = 60 * 60 * 24 * 2,
-           FourDays = 2 * TwoDays,
-           TestOpts =
-               [{default_ttl, FourDays}, {request_time, unix_now() - TwoDays}]
-               ++ proplists:delete(default_ttl, Opts),
-           Req = {<<"GET">>, <<"https://example.com">>, [], <<"">>},
-           http_cache:cache(Req, {200, [{<<"age">>, <<"0">>}], <<"Some content">>}, TestOpts),
-           {ok, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, TestOpts),
-           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
-        end,
-    {spawn, ?_assertNotEqual(nomatch, binary:match(F(), <<"113">>))}.
-
 rfc7234_section_4_2_3_age_no_date_header(Opts) ->
     F = fun() ->
            Req = {<<"GET">>, <<"https://example.com">>, [], <<"">>},
@@ -921,20 +914,6 @@ rfc7234_section_4_2_3_age_with_date_header(Opts) ->
            proplists:get_value(<<"age">>, RespHeaders)
         end,
     {spawn, ?_assertEqual(F(), <<"120">>)}.
-
-rfc7234_section_4_2_4_stale_response_warning_generated(Opts) ->
-    F = fun() ->
-           Req = {<<"GET">>,
-                  <<"https://example.com">>,
-                  [{<<"cache-control">>, <<"max-stale=10">>}],
-                  <<"">>},
-           http_cache:cache(Req,
-                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
-                            Opts),
-           {stale, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, Opts),
-           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
-        end,
-    {spawn, ?_assertNotEqual(nomatch, binary:match(F(), <<"110">>))}.
 
 rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_cache(Opts) ->
     F = fun() ->
@@ -1359,6 +1338,78 @@ rfc7234_section_5_2_1_5_ccdir_no_store(Opts) ->
                        http_cache:get({<<"GET">>, <<"https://example.com">>, [], <<"">>}, Opts)
                    end)}.
 
+rfc7234_section_5_2_1_6_ccdir_no_transform_auto_compress(Opts) ->
+    Req = {<<"GET">>,
+           <<"https://example.com">>,
+           [{<<"cache-control">>, <<"no-transform">>}],
+           <<"">>},
+    Resp =
+        {200, [{<<"content-type">>, <<"text/plain">>}], <<"Some content not to transform">>},
+    Store = fun() -> http_cache:cache(Req, Resp, set_opt(auto_compress, true, Opts)) end,
+    {spawn,
+     ?_assertMatch(<<"Some content not to transform">>,
+                   begin
+                       Store(),
+                       {ok, {_, {_, _, RespBody}}} =
+                           http_cache:get({<<"GET">>,
+                                           <<"https://example.com">>,
+                                           [{<<"accept-encoding">>, <<"gzip">>}],
+                                           <<"">>},
+                                          set_opt(auto_decompress, true, Opts)),
+                       RespBody
+                   end)}.
+
+rfc7234_section_5_2_1_6_ccdir_no_transform_auto_decompress(Opts) ->
+    Req = {<<"GET">>,
+           <<"https://example.com">>,
+           [{<<"cache-control">>, <<"no-transform">>}],
+           <<"">>},
+    Resp =
+        {200, [{<<"content-encoding">>, <<"gzip">>}], zlib:gzip(<<"Some compressed content">>)},
+    Store = fun() -> http_cache:cache(Req, Resp, Opts) end,
+    {spawn,
+     ?_assertMatch(undefined,
+                   begin
+                       Store(),
+                       http_cache:get({<<"GET">>, <<"https://example.com">>, [], <<"">>},
+                                      set_opt(auto_decompress, true, Opts))
+                   end)}.
+
+rfc7234_section_5_2_1_6_ccdir_no_transform_range(Opts) ->
+    Req = {<<"GET">>, <<"https://example.com">>, [], <<"">>},
+    Resp = {200, [], <<"Some content">>},
+    F = fun() ->
+           http_cache:cache(Req, Resp, Opts),
+           {ok, {_, CacheResp}} =
+               http_cache:get({<<"GET">>,
+                               <<"https://example.com">>,
+                               [{<<"range">>, <<"bytes=1-3">>}],
+                               <<"">>},
+                              Opts),
+           CacheResp
+        end,
+    {spawn, ?_assertMatch({200, _, <<"Some content">>}, F())}.
+
+rfc7234_section_5_2_1_7_ccdir_only_if_cached(Opts) ->
+    Req = {<<"GET">>, <<"https://example.com">>, [], <<"">>},
+    Resp = {200, [], <<"Some content">>},
+    F = fun() -> http_cache:cache(Req, Resp, Opts) end,
+    [{spawn,
+      ?_assertMatch({ok, {_, {200, _, _}}},
+                    begin
+                        F(),
+                        http_cache:get(Req, Opts)
+                    end)},
+     {spawn,
+      ?_assertMatch({ok, {_, {504, _, _}}},
+                    begin
+                        http_cache:get({<<"GET">>,
+                                        <<"https://example.com/not_cached">>,
+                                        [],
+                                        <<"">>},
+                                       Opts)
+                    end)}].
+
 rfc7234_section_5_2_2_1_ccdir_must_revalidate(Opts) ->
     Req = {<<"GET">>, <<"https://example.com">>, [], <<"">>},
     Store =
@@ -1603,6 +1654,77 @@ rfc7234_section_5_4_header_pragma(Opts) ->
                                   {<<"cache-control">>, <<"&%^%!^@(^^">>}]),
                            http_cache:get(Req, Opts)
                        end)}].
+
+rfc7234_section_5_5_1_response_is_stale(Opts) ->
+    F = fun() ->
+           Req = {<<"GET">>,
+                  <<"https://example.com">>,
+                  [{<<"cache-control">>, <<"max-stale=10">>}],
+                  <<"">>},
+           http_cache:cache(Req,
+                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
+                            Opts),
+           {stale, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, Opts),
+           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
+        end,
+    {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"110">>))}.
+
+rfc7234_section_5_5_2_warning_revalidation_failed(Opts) ->
+    F = fun() ->
+           Req = {<<"GET">>, <<"https://example.com">>, [], <<"">>},
+           http_cache:cache(Req,
+                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
+                            Opts),
+           {stale, {_, {_, RespHeaders, _}}} =
+               http_cache:get(Req, [{cache_disconnected, true} | Opts]),
+           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
+        end,
+    {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"111">>))}.
+
+rfc7234_section_5_5_4_warning_heuristics_expiration(Opts) ->
+    F = fun() ->
+           TwoDays = 60 * 60 * 24 * 2,
+           FourDays = 2 * TwoDays,
+           TestOpts =
+               [{default_ttl, FourDays}, {request_time, unix_now() - TwoDays}]
+               ++ proplists:delete(default_ttl, Opts),
+           Req = {<<"GET">>, <<"https://example.com">>, [], <<"">>},
+           http_cache:cache(Req, {200, [{<<"age">>, <<"0">>}], <<"Some content">>}, TestOpts),
+           {ok, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, TestOpts),
+           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
+        end,
+    {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"113">>))}.
+
+rfc7234_section_5_5_6_plain_compressed(Opts) ->
+    F = fun(ReqHeaders) ->
+           http_cache:cache({<<"GET">>, <<"https://example.com">>, [], <<"">>},
+                            {200, [{<<"content-type">>, <<"text/plain">>}], <<"Some content">>},
+                            set_opt(auto_compress, true, Opts)),
+           {ok, {_, {200, RespHeaders, _}}} =
+               http_cache:get({<<"GET">>, <<"https://example.com">>, ReqHeaders, <<"">>},
+                              set_opt(auto_decompress, true, Opts)),
+           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
+        end,
+    [{spawn,
+      ?_assertMatch({_, _}, binary:match(F([{<<"accept-encoding">>, <<"gzip">>}]), <<"214">>))},
+     {spawn, ?_assertMatch(nomatch, binary:match(F([]), <<"214">>))}].
+
+rfc7234_section_5_5_6_already_compressed(Opts) ->
+    F = fun(ReqHeaders) ->
+           http_cache:cache({<<"GET">>, <<"https://example.com">>, [], <<"">>},
+                            {200,
+                             [{<<"content-encoding">>, <<"gzip">>}],
+                             zlib:gzip(<<"Some content">>)},
+                            Opts),
+           {ok, {_, {200, RespHeaders, _}}} =
+               http_cache:get({<<"GET">>, <<"https://example.com">>, ReqHeaders, <<"">>},
+                              set_opt(auto_decompress, true, Opts)),
+           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
+        end,
+    [{spawn,
+      ?_assertMatch(nomatch,
+                    binary:match(F([{<<"accept-encoding">>, <<"gzip">>}]), <<"214">>))},
+     {spawn, ?_assertMatch({_, _}, binary:match(F([]), <<"214">>))}].
 
 rfc5861_stale_while_revalidate_not_expired(Opts) ->
     Req = {<<"GET">>, <<"https://example.com">>, [], <<"">>},
