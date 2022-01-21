@@ -168,7 +168,6 @@
     {store, module()} |
     {type, type()} |
     {request_time, non_neg_integer()}.
-
 -type invalidation_result() ::
     {ok, NbInvalidation :: non_neg_integer() | undefined} | {error, term()}.
 
@@ -279,7 +278,6 @@
              {stale, {response_ref(), response()}} |
              {must_revalidate, {response_ref(), response()}} |
              miss.
-
 get(Request, Opts) ->
     do_get(Request, normalize_opts(Opts)).
 
@@ -307,44 +305,53 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
     case MaybeCandidate of
         {Freshness, {RespRef, _Status, _RespHeaders, _VaryHeaders, _RespMetadata}} ->
             case Store:get_response(RespRef) of
-                {Status, RespHeaders, _, _} = Response ->
-                    case Freshness of
-                        fresh ->
-                            postprocess_response(fresh,
-                                                 Request,
-                                                 ParsedReqHeaders,
-                                                 RespRef,
-                                                 Response,
-                                                 StartTime,
-                                                 Measurements,
-                                                 Opts);
-                        stale ->
-                            postprocess_response(stale,
-                                                 Request,
-                                                 ParsedReqHeaders,
-                                                 RespRef,
-                                                 Response,
-                                                 StartTime,
-                                                 Measurements,
-                                                 Opts);
-                        must_revalidate ->
-                            telemetry:execute(?TELEMETRY_LOOKUP_EVT,
-                                              maps:put(total_time,
-                                                       now_monotonic_us() - StartTime,
-                                                       Measurements),
-                                              #{freshness => must_revalidate}),
-                            {must_revalidate, {RespRef, {Status, RespHeaders, undefined}}}
-                    end;
+                {_, _, _, _} = Response ->
+                    postprocess_response(Freshness,
+                                         Request,
+                                         ParsedReqHeaders,
+                                         RespRef,
+                                         Response,
+                                         StartTime,
+                                         Measurements,
+                                         Opts);
                 undefined ->
                     throw(resp_body_not_accessible)
             end;
         undefined ->
-            telemetry:execute(?TELEMETRY_LOOKUP_EVT,
-                              maps:put(total_time, now_monotonic_us() - StartTime, Measurements),
-                              #{freshness => undefined}),
-            miss
+            postprocess_response(miss,
+                                 Request,
+                                 ParsedReqHeaders,
+                                 undefined,
+                                 undefined,
+                                 StartTime,
+                                 Measurements,
+                                 Opts)
     end.
 
+postprocess_response(Freshness,
+                     _Request,
+                     ParsedReqHeaders,
+                     RespRef,
+                     Resp,
+                     StartTime,
+                     Measurements,
+                     _Opts)
+    when Freshness == must_revalidate orelse Freshness == miss ->
+    Ret = case ParsedReqHeaders of
+              #{<<"cache-control">> := #{<<"only-if-cached">> := _}} ->
+                  {fresh, {undefined, {504, [], <<"">>}}};
+              _ ->
+                  case Freshness of
+                      must_revalidate ->
+                          {must_revalidate, {RespRef, Resp}};
+                      miss ->
+                          miss
+                  end
+          end,
+    telemetry:execute(?TELEMETRY_LOOKUP_EVT,
+                      maps:put(total_time, now_monotonic_us() - StartTime, Measurements),
+                      #{freshness => Freshness}),
+    Ret;
 postprocess_response(Freshness,
                      Request,
                      ParsedReqHeaders,

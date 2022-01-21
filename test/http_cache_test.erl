@@ -175,8 +175,10 @@ opt_auto_accept_encoding(Opts) ->
         end,
     [{spawn, ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzip">>}]) end)},
      {spawn, ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzip,br">>}]) end)},
-     {spawn, ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzip, br">>}]) end)},
-     {spawn, ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"br, gzip">>}]) end)},
+     {spawn,
+      ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzip, br">>}]) end)},
+     {spawn,
+      ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"br, gzip">>}]) end)},
      {spawn,
       ?_assertMatch({fresh, _},
                     begin
@@ -191,7 +193,8 @@ opt_auto_accept_encoding(Opts) ->
                     end)},
      {spawn, ?_assertNotMatch({fresh, _}, begin F([]) end)},
      {spawn, ?_assertNotMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"br">>}]) end)},
-     {spawn, ?_assertNotMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzipv2">>}]) end)},
+     {spawn,
+      ?_assertNotMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzipv2">>}]) end)},
      {spawn,
       ?_assertNotMatch({fresh, _},
                        begin
@@ -1072,9 +1075,11 @@ rfc7234_section_4_3_2_if_modified_since(Opts) ->
        ?_assertMatch({fresh, {_, {304, _, _}}},
                      F(Method, [{<<"date">>, Now}], [{<<"if-modified-since">>, Future}]))},
       {spawn,
-       ?_assertMatch({fresh, {_, {200, _, _}}}, F(Method, [], [{<<"if-modified-since">>, Past}]))},
+       ?_assertMatch({fresh, {_, {200, _, _}}},
+                     F(Method, [], [{<<"if-modified-since">>, Past}]))},
       {spawn,
-       ?_assertMatch({fresh, {_, {304, _, _}}}, F(Method, [], [{<<"if-modified-since">>, Now}]))},
+       ?_assertMatch({fresh, {_, {304, _, _}}},
+                     F(Method, [], [{<<"if-modified-since">>, Now}]))},
       {spawn,
        ?_assertMatch({fresh, {_, {304, _, _}}},
                      F(Method, [], [{<<"if-modified-since">>, Future}]))}]
@@ -1132,7 +1137,8 @@ rfc7234_section_4_3_2_if_range_with_etag(Opts) ->
                     F([{<<"if-range">>, <<"W/\"some-etag\"">>}],
                       [{<<"etag">>, <<"W/\"some-etag\"">>}]))},
      {spawn,
-      ?_assertMatch({fresh, {_, {200, _, _}}}, F([{<<"if-range">>, <<"W/\"some-etag\"">>}], []))}].
+      ?_assertMatch({fresh, {_, {200, _, _}}},
+                    F([{<<"if-range">>, <<"W/\"some-etag\"">>}], []))}].
 
 rfc7234_section_4_3_2_if_range_with_date(Opts) ->
     OneAndAHalfMinuteAgo = timestamp_to_rfc7231(unix_now() - 90),
@@ -1160,7 +1166,8 @@ rfc7234_section_4_3_2_if_range_with_date(Opts) ->
       ?_assertMatch({fresh, {_, {200, _, _}}},
                     F([{<<"if-range">>, Now}], [{<<"last-modified">>, HalfMinuteAgo}]))},
      {spawn,
-      ?_assertMatch({fresh, {_, {200, _, _}}}, F([{<<"if-range">>, Now}], [{<<"date">>, Now}]))},
+      ?_assertMatch({fresh, {_, {200, _, _}}},
+                    F([{<<"if-range">>, Now}], [{<<"date">>, Now}]))},
      {spawn, ?_assertMatch({fresh, {_, {200, _, _}}}, F([{<<"if-range">>, Now}], []))}].
 
 rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status(Opts) ->
@@ -1392,25 +1399,25 @@ rfc7234_section_5_2_1_6_ccdir_no_transform_range(Opts) ->
 
 rfc7234_section_5_2_1_7_ccdir_only_if_cached(Opts) ->
     F = fun(RespHeaders) ->
-            http_cache:cache(
-              {<<"GET">>, <<"http://example.com">>, [], <<"">>},
-              {200, RespHeaders, <<"Some content">>},
-              Opts
-             ),
-            http_cache:get(
-              {<<"GET">>, <<"http://example.com">>, [{<<"cache-control">>, <<"only-if-cached">>}], <<"">>},
-              Opts
-             )
+           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+                            {200, RespHeaders, <<"Some content">>},
+                            Opts),
+           http_cache:get({<<"GET">>,
+                           <<"http://example.com">>,
+                           [{<<"cache-control">>, <<"only-if-cached">>}],
+                           <<"">>},
+                          Opts)
         end,
-    [
-     {spawn, ?_assertMatch({fresh, {_, {200, _, _}}}, F([]))},
-     {spawn, ?_assertMatch({fresh, {_, {504, _, _}}}, F([{<<"cache-control">>, <<"max-age=0">>}]))},
-     {spawn, ?_assertMatch({fresh, {_, {504, _, _}}},
-                          http_cache:get(
-                            {<<"GET">>, <<"http://example.com/not_cached">>, [{<<"cache-control">>, <<"only-if-cached">>}], <<"">>},
-                            Opts
-                           ))}
-     ].
+    [{spawn, ?_assertMatch({fresh, {_, {200, _, _}}}, F([]))},
+     {spawn,
+      ?_assertMatch({fresh, {_, {504, _, _}}}, F([{<<"cache-control">>, <<"max-age=0">>}]))},
+     {spawn,
+      ?_assertMatch({fresh, {_, {504, _, _}}},
+                    http_cache:get({<<"GET">>,
+                                    <<"http://example.com/not_cached">>,
+                                    [{<<"cache-control">>, <<"only-if-cached">>}],
+                                    <<"">>},
+                                   Opts))}].
 
 rfc7234_section_5_2_2_1_ccdir_must_revalidate(Opts) ->
     Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
@@ -1925,7 +1932,8 @@ rfc7233_no_satisfiable_range(Opts) ->
     [{spawn, ?_assertMatch({fresh, {_, {416, _, _}}}, begin F(<<"0-1337">>) end)},
      {spawn, ?_assertMatch({fresh, {_, {416, _, _}}}, begin F(<<"1337-0">>) end)},
      {spawn, ?_assertMatch({fresh, {_, {416, _, _}}}, begin F(<<"1337-">>) end)},
-     {spawn, ?_assertMatch({fresh, {_, {416, _, _}}}, begin F(<<"1337-2000,3000-5000">>) end)}].
+     {spawn,
+      ?_assertMatch({fresh, {_, {416, _, _}}}, begin F(<<"1337-2000,3000-5000">>) end)}].
 
 rfc7233_no_satisfiable_range_content_range_header(Opts) ->
     F = fun() ->
