@@ -23,7 +23,7 @@
 %% HTTP response. The atom `undefined' is returned as a body in case response has
 %% to be revalidated (and therefore the body cannot and shouldn't be used).
 -type sendfile() ::
-    {senfile,
+    {sendfile,
      Offset :: non_neg_integer(),
      Length :: non_neg_integer() | all,
      Path :: binary()}.
@@ -106,7 +106,7 @@
 %%    Used by {@link get/2} and {@link cache/3}. Defaults to the atom `default'.
 %%  </li>
 %%  <li>
-%%    `cache_disconnected': indicates that the current cache using this library is unable to
+%%    `origin_unreachable': indicates that the current cache using this library is unable to
 %%    reach the origin server. In this case, a stale response can be returned even if the
 %%    HTTP cache headers do not explicitely allow it.
 %%    Used by {@link get/2}. Defaults to `false'.
@@ -160,7 +160,7 @@
     {auto_compress, boolean()} |
     {auto_decompress, boolean()} |
     {bucket, term()} |
-    {cache_disconnected, boolean()} |
+    {origin_unreachable, boolean()} |
     {default_ttl, non_neg_integer() | none} |
     {default_grace, non_neg_integer() | none} |
     {ignore_query_params_order, boolean()} |
@@ -168,8 +168,6 @@
     {store, module()} |
     {type, type()} |
     {request_time, non_neg_integer()}.
-
-    %TODO: rename to origin_unreachable
 
 -type invalidation_result() ::
     {ok, NbInvalidation :: non_neg_integer() | undefined} | {error, term()}.
@@ -215,7 +213,7 @@
           auto_compress => false,
           auto_decompress => false,
           bucket => default,
-          cache_disconnected => false,
+          origin_unreachable => false,
           default_ttl => ?DEFAULT_TTL,
           default_grace => ?DEFAULT_GRACE,
           ignore_query_params_order => false,
@@ -236,7 +234,7 @@
 %%
 %% The function returns one of:
 %% <dl>
-%%    <dt>`{ok, {response_ref(), response()}}'</dt>
+%%    <dt>`{fresh, {response_ref(), response()}}'</dt>
 %%    <dd>
 %%    The response is fresh and can be returned directly to the client.
 %%
@@ -257,14 +255,14 @@
 %%      <ul>
 %%        <li>`allow_stale_while_revalidate'</li>
 %%        <li>`allow_stale_if_error'</li>
-%%        <li>`cache_disconnected'</li>
+%%        <li>`origin_unreachable'</li>
 %%      </ul>
 %%    </dd>
 %%    <dt>`{must_revalidate, {response_ref(), response()}}'</dt>
 %%    <dd>
 %%    The response must be revalidated.
 %%    </dd>
-%%    <dt>`undefined'</dt>
+%%    <dt>`miss'</dt>
 %%    <dd>No suitable response was found.</dd>
 %% </dl>
 %%
@@ -277,12 +275,10 @@
 %%------------------------------------------------------------------------------
 
 -spec get(request(), opts()) ->
-             {ok, {response_ref(), response()}} |
+             {fresh, {response_ref(), response()}} |
              {stale, {response_ref(), response()}} |
              {must_revalidate, {response_ref(), response()}} |
-             undefined.
-  %TODO: response ref probably unnecessary
-  %TODO: rename rfreshness to fresh | stale | must_revalidate | miss
+             miss.
 
 get(Request, Opts) ->
     do_get(Request, normalize_opts(Opts)).
@@ -314,7 +310,7 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
                 {Status, RespHeaders, _, _} = Response ->
                     case Freshness of
                         fresh ->
-                            postprocess_response(ok,
+                            postprocess_response(fresh,
                                                  Request,
                                                  ParsedReqHeaders,
                                                  RespRef,
@@ -346,7 +342,7 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
             telemetry:execute(?TELEMETRY_LOOKUP_EVT,
                               maps:put(total_time, now_monotonic_us() - StartTime, Measurements),
                               #{freshness => undefined}),
-            undefined
+            miss
     end.
 
 postprocess_response(Freshness,
@@ -725,7 +721,7 @@ candidate_freshness({_, _, _, _, #{parsed_headers := ParsedRespHeaders}} = Candi
                         orelse resp_stale_while_revalidate_satisfied(Candidate,
                                                                      ParsedRespHeaders,
                                                                      Opts)
-                        orelse map_get(cache_disconnected, Opts),
+                        orelse map_get(origin_unreachable, Opts),
 
                     case CanBeServedStale of
                         true ->
