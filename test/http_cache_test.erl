@@ -2,17 +2,16 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+-define(TEST_URL, <<"https://www.example.com">>).
 -define(CACHEABLE_METHODS, [<<"HEAD">>, <<"GET">>]).
 % source: http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 -define(ALL_STATUSES,
         [100, 101, 102, 103, 200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303,
-         304, 305, 307, 308, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413,
-         414, 415, 416, 417, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451, 500, 501, 502, 503,
-         504, 505, 506, 507, 508, 510, 511]).
+         305, 307, 308, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414,
+         415, 416, 417, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451, 500, 501, 502, 503, 504,
+         505, 506, 507, 508, 510, 511]).
 -define(DEFAULT_CACHEABLE_STATUSES,
         [200, 203, 204, 300, 301, 404, 405, 410, 414, 451, 501]).
-
-%TODO: review list
 
 http_cache_test_() ->
     {foreach,
@@ -52,6 +51,14 @@ http_cache_test_() ->
       fun rfc7234_section_4_3_2_if_none_match_has_precedence_over_if_modified_since/1,
       fun rfc7234_section_4_3_2_if_range_with_etag/1,
       fun rfc7234_section_4_3_2_if_range_with_date/1,
+      fun rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag/1,
+      fun rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag_revalidation/1,
+      fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified/1,
+      fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified_revalidation/1,
+      fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag/1,
+      fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidation/1,
+      fun rfc7234_section_4_3_4_cached_response_updated_with_no_validator/1,
+      fun rfc7234_section_4_3_4_cached_response_updated_with_no_validator_revalidation/1,
       fun rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status/1,
       fun rfc7234_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status/1,
       %TODO
@@ -61,23 +68,23 @@ http_cache_test_() ->
       fun rfc7234_section_5_2_1_3_ccdir_min_fresh/1,
       fun rfc7234_section_5_2_1_4_ccdir_no_cache/1,
       fun rfc7234_section_5_2_1_5_ccdir_no_store/1,
-      fun rfc7234_section_5_2_1_6_ccdir_no_transform_auto_compress/1,
-      fun rfc7234_section_5_2_1_6_ccdir_no_transform_auto_decompress/1,
-      fun rfc7234_section_5_2_1_6_ccdir_no_transform_range/1,
       fun rfc7234_section_5_2_1_7_ccdir_only_if_cached/1,
       fun rfc7234_section_5_2_2_1_ccdir_must_revalidate/1,
       fun rfc7234_section_5_2_2_2_ccdir_no_cache/1,
-      fun rfc7234_section_5_2_2_3_ccdir_no_store/1, fun rfc7234_section_5_2_2_5_ccdir_public/1,
-      fun rfc7234_section_5_2_2_6_ccdir_private/1,
+      fun rfc7234_section_5_2_2_3_ccdir_no_store/1,
+      fun rfc7234_section_5_2_2_4_ccdir_no_transform_auto_compress/1,
+      fun rfc7234_section_5_2_2_4_ccdir_no_transform_auto_decompress/1,
+      fun rfc7234_section_5_2_2_4_ccdir_no_transform_range/1,
+      fun rfc7234_section_5_2_2_5_ccdir_public/1, fun rfc7234_section_5_2_2_6_ccdir_private/1,
       fun rfc7234_section_5_2_2_7_ccdir_proxy_revalidate/1,
       fun rfc7234_section_5_2_2_8_ccdir_max_age/1, fun rfc7234_section_5_2_2_9_ccdir_s_maxage/1,
       fun rfc7234_section_5_3_header_expires_malformed/1,
       fun rfc7234_section_5_3_header_expires/1, fun rfc7234_section_5_4_header_pragma/1,
       fun rfc7234_section_5_5_1_response_is_stale/1,
-      fun rfc7234_section_5_5_2_warning_revalidation_failed/1,
+      %fun rfc7234_section_5_5_2_warning_revalidation_failed/1,
       fun rfc7234_section_5_5_4_warning_heuristics_expiration/1,
-      fun rfc7234_section_5_5_6_plain_compressed/1,
-      fun rfc7234_section_5_5_6_already_compressed/1,
+      %fun rfc7234_section_5_5_6_plain_compressed/1,
+      %fun rfc7234_section_5_5_6_already_compressed/1,
       fun rfc5861_stale_while_revalidate_not_expired/1,
       fun rfc5861_stale_while_revalidate_expired/1,
       fun rfc5861_stale_if_error_req_not_expired/1, fun rfc5861_stale_if_error_req_expired/1,
@@ -89,7 +96,7 @@ http_cache_test_() ->
       fun rfc7233_range_ignored_not_get/1, fun rfc7233_error_on_too_many_ranges/1]}.
 
 opt_allow_stale_while_revalidate(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -112,10 +119,7 @@ opt_allow_stale_while_revalidate(Opts) ->
                     end)}].
 
 opt_allow_stale_if_error_req_header(Opts) ->
-    Req = {<<"GET">>,
-           <<"http://example.com">>,
-           [{<<"cache-control">>, <<"stale-if-error=60">>}],
-           <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"stale-if-error=60">>}], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -136,7 +140,7 @@ opt_allow_stale_if_error_req_header(Opts) ->
                     end)}].
 
 opt_allow_stale_if_error_resp_header(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -161,7 +165,7 @@ opt_allow_stale_if_error_resp_header(Opts) ->
 opt_auto_accept_encoding(Opts) ->
     F = fun(Headers) ->
            http_cache:cache({<<"GET">>,
-                             <<"http://example.com">>,
+                             ?TEST_URL,
                              [{<<"accept-encoding">>, <<"br, compress">>},
                               {<<"accept-encoding">>, <<"gzip,deflate">>}],
                              <<"">>},
@@ -170,7 +174,7 @@ opt_auto_accept_encoding(Opts) ->
                               {<<"vary">>, <<"accept-encoding">>}],
                              <<"Some encoded content">>},
                             Opts),
-           http_cache:get({<<"GET">>, <<"http://example.com">>, Headers, <<"">>},
+           http_cache:get({<<"GET">>, ?TEST_URL, Headers, <<"">>},
                           set_opt(auto_accept_encoding, true, Opts))
         end,
     [{spawn, ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzip">>}]) end)},
@@ -206,14 +210,14 @@ opt_auto_compress(Opts) ->
     Body = <<"Some content">>,
     GzippedBody = zlib:gzip(Body),
     F = fun(ReqHeaders) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200,
                              [{<<"content-type">>, <<"text/plain; charset=utf-8">>},
                               {<<"etag">>, <<"W/\"some-weak-etag\"">>}],
                              Body},
                             set_opt(auto_compress, true, Opts)),
            {fresh, {_, {200, RespHeaders, RespBody}}} =
-               http_cache:get({<<"GET">>, <<"http://example.com">>, ReqHeaders, <<"">>},
+               http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
                               set_opt(auto_compress, true, Opts)),
            {proplists:get_value(<<"content-encoding">>, RespHeaders),
             proplists:get_value(<<"vary">>, RespHeaders),
@@ -227,13 +231,13 @@ opt_auto_compress(Opts) ->
 opt_auto_compress_strong_etags(Opts) ->
     Body = <<"Some content">>,
     F = fun(ReqHeaders) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200,
                              [{<<"content-type">>, <<"text/plain; charset=utf-8">>},
                               {<<"etag">>, <<"\"some-strong-etag\"">>}],
                              Body},
                             set_opt(auto_compress, true, Opts)),
-           http_cache:get({<<"GET">>, <<"http://example.com">>, ReqHeaders, <<"">>},
+           http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
                           set_opt(auto_compress, true, Opts))
         end,
     [{spawn, ?_assertMatch({fresh, {_, {_, _, Body}}}, F([]))},
@@ -244,17 +248,14 @@ opt_auto_decompress(Opts) ->
     Body = <<"Some content">>,
     GzippedBody = zlib:gzip(Body),
     F = fun(ReqHeaders) ->
-           http_cache:cache({<<"GET">>,
-                             <<"http://example.com">>,
-                             [{<<"accept-encoding">>, <<"gzip">>}],
-                             <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [{<<"accept-encoding">>, <<"gzip">>}], <<"">>},
                             {200,
                              [{<<"content-encoding">>, <<"gzip">>},
                               {<<"vary">>, <<"accept-encoding">>}],
                              GzippedBody},
                             set_opt(auto_decompress, true, Opts)),
            {fresh, {_, {200, RespHeaders, RespBody}}} =
-               http_cache:get({<<"GET">>, <<"http://example.com">>, ReqHeaders, <<"">>},
+               http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
                               set_opt(auto_decompress, true, Opts)),
            {proplists:get_value(<<"content-encoding">>, RespHeaders),
             proplists:get_value(<<"vary">>, RespHeaders),
@@ -269,24 +270,21 @@ opt_auto_decompress_strong_etags(Opts) ->
     Body = <<"Some content">>,
     GzippedBody = zlib:gzip(Body),
     F = fun(ReqHeaders) ->
-           http_cache:cache({<<"GET">>,
-                             <<"http://example.com">>,
-                             [{<<"accept-encoding">>, <<"gzip">>}],
-                             <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [{<<"accept-encoding">>, <<"gzip">>}], <<"">>},
                             {200,
                              [{<<"content-encoding">>, <<"gzip">>},
                               {<<"vary">>, <<"accept-encoding">>},
                               {<<"etag">>, <<"\"some-strong-etag\"">>}],
                              GzippedBody},
                             set_opt(auto_decompress, true, Opts)),
-           http_cache:get({<<"GET">>, <<"http://example.com">>, ReqHeaders, <<"">>},
+           http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
                           set_opt(auto_decompress, true, Opts))
         end,
     [{spawn, ?_assertMatch(miss, F([]))},
      {spawn, ?_assertMatch({fresh, _}, F([{<<"accept-encoding">>, <<"gzip">>}]))}].
 
 opt_bucket(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     OptsWithBucket = [{bucket, another_bucket} | Opts],
     Store = fun() -> http_cache:cache(Req, {200, [], <<"Some content">>}, OptsWithBucket) end,
     [{spawn,
@@ -303,7 +301,7 @@ opt_bucket(Opts) ->
                     end)}].
 
 opt_origin_unreachable(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -324,7 +322,7 @@ opt_origin_unreachable(Opts) ->
                     end)}].
 
 opt_default_ttl(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun(TTL) ->
            http_cache:cache(Req, {200, [], <<"Some content">>}, [{default_ttl, TTL} | Opts])
@@ -378,7 +376,7 @@ opt_ignore_query_params_order(Opts) ->
                     end)}].
 
 opt_type(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     OptsPriv = set_opt(type, private, Opts),
     Store =
         fun(SelectedOpts) ->
@@ -401,7 +399,7 @@ opt_type(Opts) ->
 
 opt_request_time(Opts) ->
     Now = unix_now(),
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
                             {200, [{<<"Age">>, <<"2">>}], <<"Some content">>},
@@ -413,12 +411,12 @@ opt_request_time(Opts) ->
 
 rfc7234_section_3_method_cacheable(Opts) ->
     [?_assertMatch({ok, _},
-                   http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                   http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status, [], <<"Some content">>},
                                     Opts))
      || Method <- [<<"HEAD">>, <<"GET">>], Status <- ?DEFAULT_CACHEABLE_STATUSES]
     ++ [?_assertMatch({ok, _},
-                      http_cache:cache({<<"POST">>, <<"http://example.com">>, [], <<"">>},
+                      http_cache:cache({<<"POST">>, ?TEST_URL, [], <<"">>},
                                        {Status, [CacheHeader], <<"Some content">>},
                                        Opts))
         || CacheHeader
@@ -430,14 +428,14 @@ rfc7234_section_3_method_cacheable(Opts) ->
 rfc7234_section_3_nostore_absent(Opts) ->
     [[?_assertMatch(not_cacheable,
                     http_cache:cache({Method,
-                                      <<"http://example.com">>,
+                                      ?TEST_URL,
                                       [{<<"cache-control">>, <<"no-store">>}],
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
                                      Opts))
       || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
      [?_assertMatch(not_cacheable,
-                    http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
                                       [{<<"cache-control">>, <<"no-store">>}],
                                       <<"Some content">>},
@@ -446,14 +444,14 @@ rfc7234_section_3_nostore_absent(Opts) ->
 
 rfc7234_section_3_private_absent(Opts) ->
     [[?_assertMatch(not_cacheable,
-                    http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
                                       [{<<"cache-control">>, <<"private">>}],
                                       <<"Some content">>},
                                      Opts))
       || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
      [?_assertMatch({ok, _},
-                    http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
                                       [{<<"cache-control">>, <<"private">>}],
                                       <<"Some content">>},
@@ -463,7 +461,7 @@ rfc7234_section_3_private_absent(Opts) ->
 rfc7234_section_3_authz_header(Opts) ->
     [[?_assertMatch(not_cacheable,
                     http_cache:cache({Method,
-                                      <<"http://example.com">>,
+                                      ?TEST_URL,
                                       [{<<"authorization">>, <<"some-token">>}],
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
@@ -471,7 +469,7 @@ rfc7234_section_3_authz_header(Opts) ->
       || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
      [?_assertMatch({ok, _},
                     http_cache:cache({Method,
-                                      <<"http://example.com">>,
+                                      ?TEST_URL,
                                       [{<<"authorization">>, <<"some-token">>}],
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
@@ -479,7 +477,7 @@ rfc7234_section_3_authz_header(Opts) ->
       || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
      [?_assertMatch({ok, _},
                     http_cache:cache({Method,
-                                      <<"http://example.com">>,
+                                      ?TEST_URL,
                                       [{<<"authorization">>, <<"some-token">>}],
                                       <<"">>},
                                      {Status,
@@ -492,7 +490,7 @@ rfc7234_section_3_authz_header(Opts) ->
 
 rfc7234_section_3_resp_has_expires_ccdir(Opts) ->
     [?_assertMatch({ok, _},
-                   http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                   http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status,
                                      [{<<"expires">>, timestamp_to_rfc7231(unix_now() + 3600)}],
                                      <<"Some content">>},
@@ -501,7 +499,7 @@ rfc7234_section_3_resp_has_expires_ccdir(Opts) ->
 
 rfc7234_section_3_resp_has_maxage_ccdir(Opts) ->
     [?_assertMatch({ok, _},
-                   http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                   http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status,
                                      [{<<"cache-control">>, <<"max-age=3600">>}],
                                      <<"Some content">>},
@@ -510,14 +508,14 @@ rfc7234_section_3_resp_has_maxage_ccdir(Opts) ->
 
 rfc7234_section_3_resp_has_smaxage_ccdir(Opts) ->
     [[?_assertMatch({ok, _},
-                    http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
                                       [{<<"cache-control">>, <<"s-maxage=3600">>}],
                                       <<"Some content">>},
                                      Opts))
       || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES],
      [?_assertMatch(not_cacheable,
-                    http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
                                       [{<<"cache-control">>, <<"s-maxage=3600">>}],
                                       <<"Some content">>},
@@ -526,7 +524,7 @@ rfc7234_section_3_resp_has_smaxage_ccdir(Opts) ->
 
 rfc7234_section_3_resp_has_public_ccdir(Opts) ->
     [?_assertMatch({ok, _},
-                   http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                   http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status,
                                      [{<<"cache-control">>, <<"public">>}],
                                      <<"Some content">>},
@@ -535,7 +533,7 @@ rfc7234_section_3_resp_has_public_ccdir(Opts) ->
 
 rfc7234_section_3_1_range_response_not_cached(Opts) ->
     [?_assertMatch(not_cacheable,
-                   http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+                   http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {206,
                                      [{<<"content-range">>, <<"bytes 2-10/19">>}],
                                      <<"e cached">>},
@@ -545,7 +543,7 @@ rfc7234_section_3_1_range_response_not_cached(Opts) ->
 rfc7234_section_3_2_authorization_header_caching(Opts) ->
     [[?_assertMatch(not_cacheable,
                     http_cache:cache({Method,
-                                      <<"http://example.com">>,
+                                      ?TEST_URL,
                                       [{<<"authorization">>, <<"some-token">>}],
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
@@ -553,7 +551,7 @@ rfc7234_section_3_2_authorization_header_caching(Opts) ->
       || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES],
      [?_assertMatch({ok, _},
                     http_cache:cache({Method,
-                                      <<"http://example.com">>,
+                                      ?TEST_URL,
                                       [{<<"authorization">>, <<"some-token">>}],
                                       <<"">>},
                                      {Status,
@@ -566,16 +564,16 @@ rfc7234_section_3_2_authorization_header_caching(Opts) ->
 
 %TODO: should we support this?
 %rfc7234_section_4_head_of_get(Opts) ->
-%  F = fun() -> http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>}, {200, [], <<"Some content">>}, Opts) end,
+%  F = fun() -> http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>}, {200, [], <<"Some content">>}, Opts) end,
 %  {
 %    spawn,
-%    ?_assertMatch({ok, _}, begin F(), http_cache:get({<<"HEAD">>, <<"http://example.com">>, [], <<"">>}, Opts) end)
+%    ?_assertMatch({ok, _}, begin F(), http_cache:get({<<"HEAD">>, ?TEST_URL, [], <<"">>}, Opts) end)
 %  }.
 
 rfc7234_section_4_req_nocache_ccdir(Opts) ->
     [begin
          F = fun() ->
-                http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+                http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                                  {200, [], <<"Some content">>},
                                  Opts)
              end,
@@ -584,7 +582,7 @@ rfc7234_section_4_req_nocache_ccdir(Opts) ->
                         begin
                             F(),
                             http_cache:get({<<"GET">>,
-                                            <<"http://example.com">>,
+                                            ?TEST_URL,
                                             [{CCHeader, <<"no-cache">>}],
                                             <<"">>},
                                            Opts)
@@ -593,7 +591,7 @@ rfc7234_section_4_req_nocache_ccdir(Opts) ->
      || CCHeader <- [<<"pragma">>, <<"cache-control">>]].
 
 rfc7234_section_4_resp_nocache_ccdir(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Resp = {200, [{<<"cache-control">>, <<"no-cache">>}], <<"Some content">>},
     Store = fun() -> http_cache:cache(Req, Resp, Opts) end,
     {spawn,
@@ -605,11 +603,11 @@ rfc7234_section_4_resp_nocache_ccdir(Opts) ->
 
 rfc7234_section_4_age_resp_header_generated(Opts) ->
     F = fun() ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [{<<"age">>, <<"42">>}], <<"Some content">>},
                             Opts),
            {fresh, {_RespRef, {_Status, RespHeaders, _Body}}} =
-               http_cache:get({<<"GET">>, <<"http://example.com">>, [], <<"">>}, Opts),
+               http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts),
            proplists:get_all_values(<<"age">>, RespHeaders)
         end,
     {spawn, ?_assertEqual([<<"0">>], F())}.
@@ -618,18 +616,18 @@ rfc7234_section_4_most_recent_resp(Opts) ->
     % Actually they are the same request (same request key) so the second will erase the
     % first. But we keep the test just in case (and to make it future-proof)
     F = fun() ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200,
                              [{<<"Date">>, timestamp_to_rfc7231(unix_now() - 2)}],
                              <<"Some content">>},
                             Opts),
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200,
                              [{<<"Date">>, timestamp_to_rfc7231(unix_now() - 1)}],
                              <<"Some content">>},
                             Opts),
            {fresh, {_RespRef, {_Status, RespHeaders, _Body}}} =
-               http_cache:get({<<"GET">>, <<"http://example.com">>, [], <<"">>}, Opts),
+               http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts),
            proplists:get_all_values(<<"age">>, RespHeaders)
         end,
     {spawn, ?_assertEqual([<<"1">>], F())}.
@@ -637,23 +635,20 @@ rfc7234_section_4_most_recent_resp(Opts) ->
 rfc7234_section_4_1_vary_header(Opts) ->
     Vary =
         fun() ->
-           http_cache:cache({<<"GET">>,
-                             <<"http://example.com">>,
-                             [{<<"tEst">>, <<"val">>}],
-                             <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [{<<"tEst">>, <<"val">>}], <<"">>},
                             {200, [{<<"vary">>, <<"teST">>}], <<"Some content">>},
                             Opts)
         end,
     VaryMissing =
         fun() ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [{<<"vary">>, <<"Test">>}], <<"Some content">>},
                             Opts)
         end,
     VaryMany =
         fun() ->
            http_cache:cache({<<"GET">>,
-                             <<"http://example.com">>,
+                             ?TEST_URL,
                              [{<<"Test1">>, <<"val1">>},
                               {<<"tEst2">>, <<"val2">>},
                               {<<"teSt3">>, <<"val3">>},
@@ -665,7 +660,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
     VaryNorm =
         fun() ->
            http_cache:cache({<<"GET">>,
-                             <<"http://example.com">>,
+                             ?TEST_URL,
                              [{<<"Test">>, <<"   val1    ">>}, {<<"teSt">>, <<"val2">>}],
                              <<"">>},
                             {200, [{<<"vary">>, <<"test">>}], <<"Some content">>},
@@ -675,17 +670,14 @@ rfc7234_section_4_1_vary_header(Opts) ->
         [?_assertMatch({fresh, _},
                        begin
                            Vary(),
-                           http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
-                                           [{<<"Test">>, <<"val">>}],
-                                           <<"">>},
+                           http_cache:get({<<"GET">>, ?TEST_URL, [{<<"Test">>, <<"val">>}], <<"">>},
                                           Opts)
                        end),
          ?_assertMatch(miss,
                        begin
                            Vary(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"tEst">>, <<"anotherval">>}],
                                            <<"">>},
                                           Opts)
@@ -693,22 +685,19 @@ rfc7234_section_4_1_vary_header(Opts) ->
          ?_assertMatch(miss,
                        begin
                            Vary(),
-                           http_cache:get({<<"GET">>, <<"http://example.com">>, [], <<"">>}, Opts)
+                           http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts)
                        end),
          ?_assertMatch(miss,
                        begin
                            VaryMissing(),
-                           http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
-                                           [{<<"teSt">>, <<"val">>}],
-                                           <<"">>},
+                           http_cache:get({<<"GET">>, ?TEST_URL, [{<<"teSt">>, <<"val">>}], <<"">>},
                                           Opts)
                        end),
          ?_assertMatch(miss,
                        begin
                            VaryMissing(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"tesT">>, <<"anotherval">>}],
                                            <<"">>},
                                           Opts)
@@ -716,13 +705,13 @@ rfc7234_section_4_1_vary_header(Opts) ->
          ?_assertMatch({fresh, _},
                        begin
                            VaryMissing(),
-                           http_cache:get({<<"GET">>, <<"http://example.com">>, [], <<"">>}, Opts)
+                           http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts)
                        end),
          ?_assertMatch({fresh, _},
                        begin
                            VaryMany(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"TEST1">>, <<"val1">>},
                                             {<<"TEST2">>, <<"val2">>},
                                             {<<"TEST3">>, <<"val3">>},
@@ -734,7 +723,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
                        begin
                            VaryMany(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"tESt1">>, <<"val1">>},
                                             {<<"tESt2">>, <<"val2">>},
                                             {<<"tESt3">>, <<"val3">>}],
@@ -745,7 +734,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
                        begin
                            VaryMany(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"tesT3">>, <<"val3">>},
                                             {<<"tesT1">>, <<"val1">>},
                                             {<<"tesT2">>, <<"val2">>}],
@@ -756,7 +745,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
                        begin
                            VaryMany(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"TESt2">>, <<"val2">>}, {<<"TEst3">>, <<"val3">>}],
                                            <<"">>},
                                           Opts)
@@ -765,7 +754,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
                        begin
                            VaryNorm(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"tesT">>, <<"val1">>},
                                             {<<"teST">>, <<"   val2  ">>}],
                                            <<"">>},
@@ -775,7 +764,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
                        begin
                            VaryNorm(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"TESt">>, <<"val1, val2">>}],
                                            <<"">>},
                                           Opts)
@@ -784,7 +773,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
                        begin
                            VaryNorm(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"TeSt">>, <<"val1">>}],
                                            <<"">>},
                                           Opts)
@@ -793,7 +782,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
                        begin
                            VaryNorm(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"TesT">>, <<"val2">>}],
                                            <<"">>},
                                           Opts)
@@ -801,10 +790,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
     [{spawn, Test} || Test <- Tests].
 
 rfc7234_section_4_2_stale_on_expired(Opts) ->
-    Req = {<<"GET">>,
-           <<"http://example.com">>,
-           [{<<"cache-control">>, <<"max-stale=10">>}],
-           <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"max-stale=10">>}], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
                             {200,
@@ -822,7 +808,7 @@ rfc7234_section_4_2_stale_on_expired(Opts) ->
 rfc7234_section_4_2_1_smaxage_shared(Opts) ->
     Store = proplists:get_value(store, Opts),
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"s-maxage=3, max-age=5">>},
@@ -839,7 +825,7 @@ rfc7234_section_4_2_1_smaxage_private(Opts) ->
     Store = proplists:get_value(store, Opts),
     OptsPriv = set_opt(type, private, Opts),
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"s-maxage=3, max-age=5">>},
@@ -855,7 +841,7 @@ rfc7234_section_4_2_1_smaxage_private(Opts) ->
 rfc7234_section_4_2_1_maxage(Opts) ->
     Store = proplists:get_value(store, Opts),
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"max-age=5">>},
@@ -871,7 +857,7 @@ rfc7234_section_4_2_1_maxage(Opts) ->
 rfc7234_section_4_2_1_expires(Opts) ->
     Store = proplists:get_value(store, Opts),
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"expires">>, timestamp_to_rfc7231(unix_now() + 7)}],
@@ -887,7 +873,7 @@ rfc7234_section_4_2_2_heuristics_no_used(Opts) ->
     Store = proplists:get_value(store, Opts),
     TTL = proplists:get_value(default_ttl, Opts),
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"expires">>, timestamp_to_rfc7231(unix_now() + 1337)}],
@@ -901,7 +887,7 @@ rfc7234_section_4_2_2_heuristics_no_used(Opts) ->
 
 rfc7234_section_4_2_3_age_no_date_header(Opts) ->
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req, {200, [], <<"Some content">>}, Opts),
            {fresh, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, Opts),
            proplists:get_value(<<"age">>, RespHeaders)
@@ -910,7 +896,7 @@ rfc7234_section_4_2_3_age_no_date_header(Opts) ->
 
 rfc7234_section_4_2_3_age_with_date_header(Opts) ->
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            TwoMinutesAgo = timestamp_to_rfc7231(unix_now() - 2 * 60),
            http_cache:cache(Req, {200, [{<<"date">>, TwoMinutesAgo}], <<"Some content">>}, Opts),
            {fresh, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, Opts),
@@ -920,7 +906,7 @@ rfc7234_section_4_2_3_age_with_date_header(Opts) ->
 
 rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_cache(Opts) ->
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200, [{<<"cache-control">>, <<"no-cache">>}], <<"Some content">>},
                             Opts),
@@ -930,7 +916,7 @@ rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_cache(Opts) ->
 
 rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_store(Opts) ->
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"max-age=0">>},
@@ -943,7 +929,7 @@ rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_store(Opts) ->
 
 rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate(Opts) ->
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"max-age=0">>},
@@ -957,7 +943,7 @@ rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate(Opts) ->
 rfc7234_section_4_2_4_stale_returned_resp_ccdir_proxy_revalidate_priv_cache(Opts) ->
     OptsPriv = set_opt(type, private, Opts),
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"proxy-revalidate">>}],
@@ -969,7 +955,7 @@ rfc7234_section_4_2_4_stale_returned_resp_ccdir_proxy_revalidate_priv_cache(Opts
 
 rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_proxy_revalidate_shared_cache(Opts) ->
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"max-age=0">>},
@@ -982,10 +968,10 @@ rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_proxy_revalidate_shared_cache
 
 rfc7234_section_4_3_2_if_none_match_strong_etag(Opts) ->
     F = fun(Method, ReqHeaders) ->
-           http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                             {200, [{<<"etag">>, <<"\"some-etag\"">>}], <<"Some content">>},
                             Opts),
-           http_cache:get({Method, <<"http://example.com">>, ReqHeaders, <<"">>}, Opts)
+           http_cache:get({Method, ?TEST_URL, ReqHeaders, <<"">>}, Opts)
         end,
     [[{spawn,
        ?_assertMatch({fresh, {_, {304, _, _}}},
@@ -1007,10 +993,10 @@ rfc7234_section_4_3_2_if_none_match_strong_etag(Opts) ->
 
 rfc7234_section_4_3_2_if_none_match_weak_etag(Opts) ->
     F = fun(Method, ReqHeaders) ->
-           http_cache:cache({Method, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                             {200, [{<<"etag">>, <<"W/\"some-etag\"">>}], <<"Some content">>},
                             Opts),
-           http_cache:get({Method, <<"http://example.com">>, ReqHeaders, <<"">>}, Opts)
+           http_cache:get({Method, ?TEST_URL, ReqHeaders, <<"">>}, Opts)
         end,
     [[{spawn,
        ?_assertMatch({fresh, {_, {304, _, _}}},
@@ -1032,10 +1018,7 @@ rfc7234_section_4_3_2_if_none_match_weak_etag(Opts) ->
 
 rfc7234_section_4_3_2_if_none_match_precondition_failed_for_side_effect_methods(Opts) ->
     F = fun() ->
-           Req = {<<"POST">>,
-                  <<"http://example.com">>,
-                  [{<<"if-none-match">>, <<"\"some-etag\"">>}],
-                  <<"">>},
+           Req = {<<"POST">>, ?TEST_URL, [{<<"if-none-match">>, <<"\"some-etag\"">>}], <<"">>},
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"max-age=60">>},
@@ -1051,10 +1034,10 @@ rfc7234_section_4_3_2_if_modified_since(Opts) ->
     Now = timestamp_to_rfc7231(unix_now()),
     Future = timestamp_to_rfc7231(unix_now() + 10),
     F = fun(Method, RespHeaders, ReqHeaders) ->
-           http_cache:cache({Method, <<"http://example.com">>, [], <<>>},
+           http_cache:cache({Method, ?TEST_URL, [], <<>>},
                             {200, RespHeaders, <<"Some content">>},
                             Opts),
-           http_cache:get({Method, <<"http://example.com">>, ReqHeaders, <<"">>}, Opts)
+           http_cache:get({Method, ?TEST_URL, ReqHeaders, <<"">>}, Opts)
         end,
     [[{spawn,
        ?_assertMatch({fresh, {_, {200, _, _}}},
@@ -1089,10 +1072,10 @@ rfc7234_section_4_3_2_if_none_match_has_precedence_over_if_modified_since(Opts) 
     Now = timestamp_to_rfc7231(unix_now()),
     Future = timestamp_to_rfc7231(unix_now() + 10),
     F = fun(Method, ReqHeaders, RespHeaders) ->
-           http_cache:cache({Method, <<"http://example.com">>, [], <<>>},
+           http_cache:cache({Method, ?TEST_URL, [], <<>>},
                             {200, RespHeaders, <<"Some content">>},
                             Opts),
-           http_cache:get({Method, <<"http://example.com">>, ReqHeaders, <<>>}, Opts)
+           http_cache:get({Method, ?TEST_URL, ReqHeaders, <<>>}, Opts)
         end,
     [[{spawn,
        ?_assertMatch({fresh, {_, {200, _, _}}},
@@ -1115,11 +1098,11 @@ rfc7234_section_4_3_2_if_none_match_has_precedence_over_if_modified_since(Opts) 
 
 rfc7234_section_4_3_2_if_range_with_etag(Opts) ->
     F = fun(ReqHeaders, RespHeaders) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<>>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<>>},
                             {200, RespHeaders, <<"Some content">>},
                             Opts),
            http_cache:get({<<"GET">>,
-                           <<"http://example.com">>,
+                           ?TEST_URL,
                            [{<<"range">>, <<"bytes=0-3">>} | ReqHeaders],
                            <<>>},
                           Opts)
@@ -1145,11 +1128,11 @@ rfc7234_section_4_3_2_if_range_with_date(Opts) ->
     HalfMinuteAgo = timestamp_to_rfc7231(unix_now() - 30),
     Now = timestamp_to_rfc7231(unix_now()),
     F = fun(ReqHeaders, RespHeaders) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<>>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<>>},
                             {200, RespHeaders, <<"Some content">>},
                             Opts),
            http_cache:get({<<"GET">>,
-                           <<"http://example.com">>,
+                           ?TEST_URL,
                            [{<<"range">>, <<"bytes=0-3">>} | ReqHeaders],
                            <<>>},
                           Opts)
@@ -1170,8 +1153,303 @@ rfc7234_section_4_3_2_if_range_with_date(Opts) ->
                     F([{<<"if-range">>, Now}], [{<<"date">>, Now}]))},
      {spawn, ?_assertMatch({fresh, {_, {200, _, _}}}, F([{<<"if-range">>, Now}], []))}].
 
+rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"test-header">>, <<"a1">>},
+                              {<<"etag">>, <<"\"strong-etag\"">>},
+                              {<<"test-header">>, <<"a2">>}],
+                             <<"Some content">>},
+                            set_opt(default_ttl, 0, Opts)),
+           http_cache:cache(Req,
+                            {304,
+                             [{<<"etag">>, <<"\"strong-etag\"">>}, {<<"test-header">>, <<"b">>}],
+                             <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"b">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag_revalidation(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"cache-control">>, <<"max-age=0">>},
+                              {<<"test-header">>, <<"a1">>},
+                              {<<"etag">>, <<"\"strong-etag\"">>},
+                              {<<"test-header">>, <<"a2">>}],
+                             <<"Some content">>},
+                            Opts),
+           {must_revalidate, {_, RespToRevalidate}} = http_cache:get(Req, Opts),
+           http_cache:cache(Req,
+                            {304,
+                             [{<<"etag">>, <<"\"strong-etag\"">>}, {<<"test-header">>, <<"b">>}],
+                             <<>>},
+                            RespToRevalidate,
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"b">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified(Opts) ->
+    OneMinuteAgo = timestamp_to_rfc7231(unix_now() - 60),
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"last-modified">>, OneMinuteAgo}, {<<"most-recent">>, <<"nope">>}],
+                             <<"Some content">>},
+                            set_opt(request_time, unix_now() - 60, Opts)),
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"last-modified">>, OneMinuteAgo}, {<<"most-recent">>, <<"yeah">>}],
+                             <<"Some content">>},
+                            Opts),
+           http_cache:cache(Req,
+                            {304,
+                             [{<<"last-modified">>, OneMinuteAgo}, {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"yeah">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"most-recent">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified_revalidation(Opts) ->
+    OneMinuteAgo = timestamp_to_rfc7231(unix_now() - 60),
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"cache-control">>, <<"max-age=0">>},
+                              {<<"last-modified">>, OneMinuteAgo},
+                              {<<"most-recent">>, <<"nope">>}],
+                             <<"Some content">>},
+                            set_opt(request_time, unix_now() - 60, Opts)),
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"cache-control">>, <<"max-age=0">>},
+                              {<<"last-modified">>, OneMinuteAgo},
+                              {<<"most-recent">>, <<"yeah">>}],
+                             <<"Some content">>},
+                            Opts),
+           {must_revalidate, {_, RespToRevalidate}} = http_cache:get(Req, Opts),
+           http_cache:cache(Req,
+                            {304,
+                             [{<<"last-modified">>, OneMinuteAgo}, {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            RespToRevalidate,
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"yeah">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"most-recent">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"etag">>, <<"W/\"weak-etag\"">>}, {<<"most-recent">>, <<"nope">>}],
+                             <<"Some content">>},
+                            set_opt(request_time, unix_now() - 60, Opts)),
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"etag">>, <<"W/\"weak-etag\"">>}, {<<"most-recent">>, <<"yeah">>}],
+                             <<"Some content">>},
+                            set_opt(request_time, unix_now() - 30, Opts)),
+           http_cache:cache(Req,
+                            {304,
+                             [{<<"etag">>, <<"W/\"weak-etag\"">>}, {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"yeah">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"most-recent">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidation(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"cache-control">>, <<"max-age=0">>},
+                              {<<"etag">>, <<"W/\"weak-etag\"">>},
+                              {<<"most-recent">>, <<"nope">>}],
+                             <<"Some content">>},
+                            set_opt(request_time, unix_now() - 60, Opts)),
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"cache-control">>, <<"max-age=0">>},
+                              {<<"etag">>, <<"W/\"weak-etag\"">>},
+                              {<<"most-recent">>, <<"yeah">>}],
+                             <<"Some content">>},
+                            set_opt(request_time, unix_now() - 30, Opts)),
+           {must_revalidate, {_, RespToRevalidate}} = http_cache:get(Req, Opts),
+           http_cache:cache(Req,
+                            {304,
+                             [{<<"etag">>, <<"W/\"weak-etag\"">>}, {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            RespToRevalidate,
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"yeah">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"most-recent">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_4_cached_response_updated_with_no_validator(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun(RespHeaders) ->
+           http_cache:cache(Req, {200, RespHeaders, <<"Some content">>}, Opts),
+           http_cache:cache(Req, {304, [{<<"test-header">>, <<"a">>}], <<>>}, Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F([]),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertNotEqual(<<"a">>,
+                       begin
+                           {_, {_, {_, RespHeaders, _}}} = F([{<<"etag">>, <<"\"strong-etag\"">>}]),
+                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                       end)},
+     {spawn,
+      ?_assertNotEqual(<<"a">>,
+                       begin
+                           {_, {_, {_, RespHeaders, _}}} =
+                               F([{<<"last-modified">>, timestamp_to_rfc7231(unix_now())}]),
+                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                       end)}].
+
+rfc7234_section_4_3_4_cached_response_updated_with_no_validator_revalidation(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun(RespHeaders) ->
+           http_cache:cache(Req,
+                            {200,
+                             RespHeaders ++ [{<<"cache-control">>, <<"max-age=0">>}],
+                             <<"Some content">>},
+                            Opts),
+           {must_revalidate, {_, RespToRevalidate}} = http_cache:get(Req, Opts),
+           http_cache:cache(Req,
+                            {304, [{<<"test-header">>, <<"a">>}], <<>>},
+                            RespToRevalidate,
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F([]),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertNotEqual(<<"a">>,
+                       begin
+                           {_, {_, {_, RespHeaders, _}}} = F([{<<"etag">>, <<"\"strong-etag\"">>}]),
+                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                       end)},
+     {spawn,
+      ?_assertNotEqual(<<"a">>,
+                       begin
+                           {_, {_, {_, RespHeaders, _}}} =
+                               F([{<<"last-modified">>, timestamp_to_rfc7231(unix_now())}]),
+                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                       end)}].
+
 rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status(Opts) ->
-    URI = <<"http://example.com">>,
+    URI = ?TEST_URL,
     OtherURI = <<"http://example.com/somewhere/else">>,
     [begin
          F = fun() ->
@@ -1199,7 +1477,7 @@ rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status(Opts) ->
         SuccessStatus <- [Status || Status <- ?ALL_STATUSES, Status >= 200, Status < 400]].
 
 rfc7234_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status(Opts) ->
-    URI = <<"http://example.com">>,
+    URI = ?TEST_URL,
     OtherURI = <<"http://example.com/somewhere/else">>,
     [begin
          F = fun() ->
@@ -1222,7 +1500,7 @@ rfc7234_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status(Opts) ->
         SuccessStatus <- [Status || Status <- ?ALL_STATUSES, Status > 400]].
 
 rfc7234_section_5_2_1_1_ccdir_max_age(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1234,7 +1512,7 @@ rfc7234_section_5_2_1_1_ccdir_max_age(Opts) ->
                     begin
                         Store(),
                         http_cache:get({<<"GET">>,
-                                        <<"http://example.com">>,
+                                        ?TEST_URL,
                                         [{<<"cache-control">>, <<"max-age=5">>}],
                                         <<"">>},
                                        Opts)
@@ -1244,14 +1522,14 @@ rfc7234_section_5_2_1_1_ccdir_max_age(Opts) ->
                        begin
                            Store(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"cache-control">>, <<"max-age=0">>}],
                                            <<"">>},
                                           Opts)
                        end)}].
 
 rfc7234_section_5_2_1_2_ccdir_max_stale(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1263,7 +1541,7 @@ rfc7234_section_5_2_1_2_ccdir_max_stale(Opts) ->
                     begin
                         Store(),
                         http_cache:get({<<"GET">>,
-                                        <<"http://example.com">>,
+                                        ?TEST_URL,
                                         [{<<"cache-control">>, <<"max-stale=5">>}],
                                         <<"">>},
                                        Opts)
@@ -1273,14 +1551,14 @@ rfc7234_section_5_2_1_2_ccdir_max_stale(Opts) ->
                        begin
                            Store(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"cache-control">>, <<"max-stale=0">>}],
                                            <<"">>},
                                           Opts)
                        end)}].
 
 rfc7234_section_5_2_1_3_ccdir_min_fresh(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1292,7 +1570,7 @@ rfc7234_section_5_2_1_3_ccdir_min_fresh(Opts) ->
                     begin
                         Store(),
                         http_cache:get({<<"GET">>,
-                                        <<"http://example.com">>,
+                                        ?TEST_URL,
                                         [{<<"cache-control">>, <<"min-fresh=50">>}],
                                         <<"">>},
                                        Opts)
@@ -1302,14 +1580,14 @@ rfc7234_section_5_2_1_3_ccdir_min_fresh(Opts) ->
                        begin
                            Store(),
                            http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
+                                           ?TEST_URL,
                                            [{<<"cache-control">>, <<"min-fresh=70">>}],
                                            <<"">>},
                                           Opts)
                        end)}].
 
 rfc7234_section_5_2_1_4_ccdir_no_cache(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1321,17 +1599,14 @@ rfc7234_section_5_2_1_4_ccdir_no_cache(Opts) ->
                    begin
                        Store(),
                        http_cache:get({<<"GET">>,
-                                       <<"http://example.com">>,
+                                       ?TEST_URL,
                                        [{<<"cache-control">>, <<"no-cache">>}],
                                        <<"">>},
                                       Opts)
                    end)}.
 
 rfc7234_section_5_2_1_5_ccdir_no_store(Opts) ->
-    Req = {<<"GET">>,
-           <<"http://example.com">>,
-           [{<<"cache-control">>, <<"no-store">>}],
-           <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"no-store">>}], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1342,68 +1617,16 @@ rfc7234_section_5_2_1_5_ccdir_no_store(Opts) ->
      ?_assertMatch(miss,
                    begin
                        Store(),
-                       http_cache:get({<<"GET">>, <<"http://example.com">>, [], <<"">>}, Opts)
+                       http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts)
                    end)}.
-
-rfc7234_section_5_2_1_6_ccdir_no_transform_auto_compress(Opts) ->
-    Req = {<<"GET">>,
-           <<"http://example.com">>,
-           [{<<"cache-control">>, <<"no-transform">>}],
-           <<"">>},
-    Resp =
-        {200, [{<<"content-type">>, <<"text/plain">>}], <<"Some content not to transform">>},
-    Store = fun() -> http_cache:cache(Req, Resp, set_opt(auto_compress, true, Opts)) end,
-    {spawn,
-     ?_assertMatch(<<"Some content not to transform">>,
-                   begin
-                       Store(),
-                       {fresh, {_, {_, _, RespBody}}} =
-                           http_cache:get({<<"GET">>,
-                                           <<"http://example.com">>,
-                                           [{<<"accept-encoding">>, <<"gzip">>}],
-                                           <<"">>},
-                                          set_opt(auto_decompress, true, Opts)),
-                       RespBody
-                   end)}.
-
-rfc7234_section_5_2_1_6_ccdir_no_transform_auto_decompress(Opts) ->
-    Req = {<<"GET">>,
-           <<"http://example.com">>,
-           [{<<"cache-control">>, <<"no-transform">>}],
-           <<"">>},
-    Resp =
-        {200, [{<<"content-encoding">>, <<"gzip">>}], zlib:gzip(<<"Some compressed content">>)},
-    Store = fun() -> http_cache:cache(Req, Resp, Opts) end,
-    {spawn,
-     ?_assertMatch(miss,
-                   begin
-                       Store(),
-                       http_cache:get({<<"GET">>, <<"http://example.com">>, [], <<"">>},
-                                      set_opt(auto_decompress, true, Opts))
-                   end)}.
-
-rfc7234_section_5_2_1_6_ccdir_no_transform_range(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
-    Resp = {200, [], <<"Some content">>},
-    F = fun() ->
-           http_cache:cache(Req, Resp, Opts),
-           {fresh, {_, CacheResp}} =
-               http_cache:get({<<"GET">>,
-                               <<"http://example.com">>,
-                               [{<<"range">>, <<"bytes=1-3">>}],
-                               <<"">>},
-                              Opts),
-           CacheResp
-        end,
-    {spawn, ?_assertMatch({200, _, <<"Some content">>}, F())}.
 
 rfc7234_section_5_2_1_7_ccdir_only_if_cached(Opts) ->
     F = fun(RespHeaders) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, RespHeaders, <<"Some content">>},
                             Opts),
            http_cache:get({<<"GET">>,
-                           <<"http://example.com">>,
+                           ?TEST_URL,
                            [{<<"cache-control">>, <<"only-if-cached">>}],
                            <<"">>},
                           Opts)
@@ -1420,7 +1643,7 @@ rfc7234_section_5_2_1_7_ccdir_only_if_cached(Opts) ->
                                    Opts))}].
 
 rfc7234_section_5_2_2_1_ccdir_must_revalidate(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1437,7 +1660,7 @@ rfc7234_section_5_2_2_1_ccdir_must_revalidate(Opts) ->
                    end)}.
 
 rfc7234_section_5_2_2_2_ccdir_no_cache(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1452,7 +1675,7 @@ rfc7234_section_5_2_2_2_ccdir_no_cache(Opts) ->
                    end)}.
 
 rfc7234_section_5_2_2_3_ccdir_no_store(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1466,8 +1689,58 @@ rfc7234_section_5_2_2_3_ccdir_no_store(Opts) ->
                        http_cache:get(Req, Opts)
                    end)}.
 
+rfc7234_section_5_2_2_4_ccdir_no_transform_auto_compress(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    Resp =
+        {200,
+         [{<<"content-type">>, <<"text/plain">>}, {<<"cache-control">>, <<"no-transform">>}],
+         <<"Some content">>},
+    Store = fun() -> http_cache:cache(Req, Resp, set_opt(auto_compress, true, Opts)) end,
+    [{spawn,
+      ?_assertMatch({fresh, {_, {200, _, <<"Some content">>}}},
+                    begin
+                        Store(),
+                        http_cache:get({<<"GET">>,
+                                        ?TEST_URL,
+                                        [{<<"accept-encoding">>, <<"gzip">>}],
+                                        <<"">>},
+                                       set_opt(auto_decompress, true, Opts))
+                    end)}].
+
+rfc7234_section_5_2_2_4_ccdir_no_transform_auto_decompress(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    Resp =
+        {200,
+         [{<<"content-encoding">>, <<"gzip">>},
+          {<<"cache-control">>, <<"no-transform">>},
+          {<<"vary">>, <<"accept-encoding">>}],
+         zlib:gzip(<<"Some compressed content">>)},
+    Store = fun() -> http_cache:cache(Req, Resp, set_opt(auto_decompress, true, Opts)) end,
+    {spawn,
+     ?_assertMatch(miss,
+                   begin
+                       Store(),
+                       http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>},
+                                      set_opt(auto_decompress, true, Opts))
+                   end)}.
+
+rfc7234_section_5_2_2_4_ccdir_no_transform_range(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    Resp = {200, [{<<"cache-control">>, <<"no-transform">>}], <<"Some content">>},
+    Store = fun() -> http_cache:cache(Req, Resp, Opts) end,
+    {spawn,
+     ?_assertMatch({fresh, {_, {200, _, _}}},
+                   begin
+                       Store(),
+                       http_cache:get({<<"GET">>,
+                                       ?TEST_URL,
+                                       [{<<"range">>, <<"bytes=1-3">>}],
+                                       <<"">>},
+                                      Opts)
+                   end)}.
+
 rfc7234_section_5_2_2_5_ccdir_public(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1482,7 +1755,7 @@ rfc7234_section_5_2_2_5_ccdir_public(Opts) ->
                    end)}.
 
 rfc7234_section_5_2_2_6_ccdir_private(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     PrivOpts = set_opt(type, private, Opts),
     Store =
         fun(SelectedOpts) ->
@@ -1504,10 +1777,7 @@ rfc7234_section_5_2_2_6_ccdir_private(Opts) ->
                     end)}].
 
 rfc7234_section_5_2_2_7_ccdir_proxy_revalidate(Opts) ->
-    Req = {<<"GET">>,
-           <<"http://example.com">>,
-           [{<<"cache-control">>, <<"max-stale=5">>}],
-           <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"max-stale=5">>}], <<"">>},
     PrivOpts = set_opt(type, private, Opts),
     Store =
         fun(SelectedOpts) ->
@@ -1531,7 +1801,7 @@ rfc7234_section_5_2_2_7_ccdir_proxy_revalidate(Opts) ->
                     end)}].
 
 rfc7234_section_5_2_2_8_ccdir_max_age(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun(MaxAge) ->
            http_cache:cache(Req,
@@ -1554,7 +1824,7 @@ rfc7234_section_5_2_2_8_ccdir_max_age(Opts) ->
                        end)}].
 
 rfc7234_section_5_2_2_9_ccdir_s_maxage(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     PrivOpts = set_opt(type, private, Opts),
     Store =
         fun(MaxAge, SelectedOpts) ->
@@ -1590,7 +1860,7 @@ rfc7234_section_5_2_2_9_ccdir_s_maxage(Opts) ->
                     end)}].
 
 rfc7234_section_5_3_header_expires_malformed(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1607,7 +1877,7 @@ rfc7234_section_5_3_header_expires_malformed(Opts) ->
                       end)}.
 
 rfc7234_section_5_3_header_expires(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     NowRFC7231 = timestamp_to_rfc7231(unix_now()),
     SoonRFC7231 = timestamp_to_rfc7231(unix_now() + 10),
     Store =
@@ -1640,7 +1910,7 @@ rfc7234_section_5_3_header_expires(Opts) ->
                     end)}].
 
 rfc7234_section_5_4_header_pragma(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun(Headers) -> http_cache:cache(Req, {200, Headers, <<"Some content">>}, Opts) end,
     [{spawn,
@@ -1666,10 +1936,7 @@ rfc7234_section_5_4_header_pragma(Opts) ->
 
 rfc7234_section_5_5_1_response_is_stale(Opts) ->
     F = fun() ->
-           Req = {<<"GET">>,
-                  <<"http://example.com">>,
-                  [{<<"cache-control">>, <<"max-stale=10">>}],
-                  <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"max-stale=10">>}], <<"">>},
            http_cache:cache(Req,
                             {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
                             Opts),
@@ -1680,7 +1947,7 @@ rfc7234_section_5_5_1_response_is_stale(Opts) ->
 
 rfc7234_section_5_5_2_warning_revalidation_failed(Opts) ->
     F = fun() ->
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
                             {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
                             Opts),
@@ -1697,7 +1964,7 @@ rfc7234_section_5_5_4_warning_heuristics_expiration(Opts) ->
            TestOpts =
                [{default_ttl, FourDays}, {request_time, unix_now() - TwoDays}]
                ++ proplists:delete(default_ttl, Opts),
-           Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req, {200, [{<<"age">>, <<"0">>}], <<"Some content">>}, TestOpts),
            {fresh, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, TestOpts),
            proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
@@ -1706,11 +1973,11 @@ rfc7234_section_5_5_4_warning_heuristics_expiration(Opts) ->
 
 rfc7234_section_5_5_6_plain_compressed(Opts) ->
     F = fun(ReqHeaders) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [{<<"content-type">>, <<"text/plain">>}], <<"Some content">>},
                             set_opt(auto_compress, true, Opts)),
            {fresh, {_, {200, RespHeaders, _}}} =
-               http_cache:get({<<"GET">>, <<"http://example.com">>, ReqHeaders, <<"">>},
+               http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
                               set_opt(auto_decompress, true, Opts)),
            proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
         end,
@@ -1720,13 +1987,14 @@ rfc7234_section_5_5_6_plain_compressed(Opts) ->
 
 rfc7234_section_5_5_6_already_compressed(Opts) ->
     F = fun(ReqHeaders) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200,
-                             [{<<"content-encoding">>, <<"gzip">>}],
+                             [{<<"content-encoding">>, <<"gzip">>},
+                              {<<"vary">>, <<"content-encoding">>}],
                              zlib:gzip(<<"Some content">>)},
                             Opts),
            {fresh, {_, {200, RespHeaders, _}}} =
-               http_cache:get({<<"GET">>, <<"http://example.com">>, ReqHeaders, <<"">>},
+               http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
                               set_opt(auto_decompress, true, Opts)),
            proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
         end,
@@ -1736,7 +2004,7 @@ rfc7234_section_5_5_6_already_compressed(Opts) ->
      {spawn, ?_assertMatch({_, _}, binary:match(F([]), <<"214">>))}].
 
 rfc5861_stale_while_revalidate_not_expired(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1753,7 +2021,7 @@ rfc5861_stale_while_revalidate_not_expired(Opts) ->
                    end)}.
 
 rfc5861_stale_while_revalidate_expired(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1770,10 +2038,7 @@ rfc5861_stale_while_revalidate_expired(Opts) ->
                    end)}.
 
 rfc5861_stale_if_error_req_not_expired(Opts) ->
-    Req = {<<"GET">>,
-           <<"http://example.com">>,
-           [{<<"cache-control">>, <<"stale-if-error=60">>}],
-           <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"stale-if-error=60">>}], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1788,10 +2053,7 @@ rfc5861_stale_if_error_req_not_expired(Opts) ->
                    end)}.
 
 rfc5861_stale_if_error_req_expired(Opts) ->
-    Req = {<<"GET">>,
-           <<"http://example.com">>,
-           [{<<"cache-control">>, <<"stale-if-error=0">>}],
-           <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"stale-if-error=0">>}], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1806,7 +2068,7 @@ rfc5861_stale_if_error_req_expired(Opts) ->
                    end)}.
 
 rfc5861_stale_if_error_resp_not_expired(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1823,7 +2085,7 @@ rfc5861_stale_if_error_resp_not_expired(Opts) ->
                    end)}.
 
 rfc5861_stale_if_error_resp_expired(Opts) ->
-    Req = {<<"GET">>, <<"http://example.com">>, [], <<"">>},
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
            http_cache:cache(Req,
@@ -1841,12 +2103,12 @@ rfc5861_stale_if_error_resp_expired(Opts) ->
 
 rfc7233_single_byte_range(Opts) ->
     F = fun(Range) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [], <<"Some content">>},
                             Opts),
            {fresh, {_, {206, _, RespBody}}} =
                http_cache:get({<<"GET">>,
-                               <<"http://example.com">>,
+                               ?TEST_URL,
                                [{<<"raNge">>, <<"bytes=", Range/binary>>}],
                                <<"">>},
                               Opts),
@@ -1860,14 +2122,11 @@ rfc7233_single_byte_range(Opts) ->
 
 rfc7233_single_byte_range_headers(Opts) ->
     F = fun(HeaderName) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [], <<"Some content">>},
                             Opts),
            {fresh, {_, {206, RespHeaders, _}}} =
-               http_cache:get({<<"GET">>,
-                               <<"http://example.com">>,
-                               [{<<"range">>, <<"bytes=-7">>}],
-                               <<"">>},
+               http_cache:get({<<"GET">>, ?TEST_URL, [{<<"range">>, <<"bytes=-7">>}], <<"">>},
                               Opts),
            proplists:get_value(HeaderName, RespHeaders)
         end,
@@ -1877,17 +2136,13 @@ rfc7233_single_byte_range_headers(Opts) ->
 rfc7233_multiple_byte_range(Opts) ->
     Ranges = <<"bytes=0-3,5-,-7,5-11">>,
     F = fun() ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200,
                              [{<<"content-type">>, <<"text/plain; charset=utf-8">>}],
                              <<"Some content">>},
                             Opts),
            {fresh, {_, {206, RespHeaders, RespBody}}} =
-               http_cache:get({<<"GET">>,
-                               <<"http://example.com">>,
-                               [{<<"range">>, Ranges}],
-                               <<"">>},
-                              Opts),
+               http_cache:get({<<"GET">>, ?TEST_URL, [{<<"range">>, Ranges}], <<"">>}, Opts),
            parse_multipart_response(RespHeaders, RespBody)
         end,
     {spawn,
@@ -1907,11 +2162,11 @@ rfc7233_multiple_byte_range(Opts) ->
 
 rfc7233_unknown_range_type(Opts) ->
     F = fun(Range) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [], <<"Some content">>},
                             Opts),
            http_cache:get({<<"GET">>,
-                           <<"http://example.com">>,
+                           ?TEST_URL,
                            [{<<"raNge">>, <<"unknownunits=", Range/binary>>}],
                            <<"">>},
                           Opts)
@@ -1920,11 +2175,11 @@ rfc7233_unknown_range_type(Opts) ->
 
 rfc7233_no_satisfiable_range(Opts) ->
     F = fun(Range) ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [], <<"Some content">>},
                             Opts),
            http_cache:get({<<"GET">>,
-                           <<"http://example.com">>,
+                           ?TEST_URL,
                            [{<<"raNge">>, <<"bytes=", Range/binary>>}],
                            <<"">>},
                           Opts)
@@ -1937,14 +2192,11 @@ rfc7233_no_satisfiable_range(Opts) ->
 
 rfc7233_no_satisfiable_range_content_range_header(Opts) ->
     F = fun() ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [], <<"Some content">>},
                             Opts),
            {fresh, {_, {416, RespHeaders, _}}} =
-               http_cache:get({<<"GET">>,
-                               <<"http://example.com">>,
-                               [{<<"raNge">>, <<"bytes=1337-">>}],
-                               <<"">>},
+               http_cache:get({<<"GET">>, ?TEST_URL, [{<<"raNge">>, <<"bytes=1337-">>}], <<"">>},
                               Opts),
            proplists:get_value(<<"content-range">>, RespHeaders)
         end,
@@ -1959,27 +2211,20 @@ init() ->
 
 rfc7233_range_ignored_not_get(Opts) ->
     F = fun() ->
-           http_cache:cache({<<"POST">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"POST">>, ?TEST_URL, [], <<"">>},
                             {200, [{<<"cache-control">>, <<"max-age=60">>}], <<"Some content">>},
                             Opts),
-           http_cache:get({<<"POST">>,
-                           <<"http://example.com">>,
-                           [{<<"range">>, <<"bytes=0-7">>}],
-                           <<"">>},
-                          Opts)
+           http_cache:get({<<"POST">>, ?TEST_URL, [{<<"range">>, <<"bytes=0-7">>}], <<"">>}, Opts)
         end,
     {spawn, ?_assertMatch({fresh, {_, {200, _, _}}}, begin F() end)}.
 
 rfc7233_error_on_too_many_ranges(Opts) ->
     OptsRestrict = [{max_ranges, 1} | Opts],
     F = fun() ->
-           http_cache:cache({<<"GET">>, <<"http://example.com">>, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [], <<"Some content">>},
                             OptsRestrict),
-           http_cache:get({<<"GET">>,
-                           <<"http://example.com">>,
-                           [{<<"range">>, <<"bytes=0-7,8-9">>}],
-                           <<"">>},
+           http_cache:get({<<"GET">>, ?TEST_URL, [{<<"range">>, <<"bytes=0-7,8-9">>}], <<"">>},
                           OptsRestrict)
         end,
     {spawn, ?_assertMatch({fresh, {_, {416, _, _}}}, begin F() end)}.

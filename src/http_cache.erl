@@ -1,7 +1,8 @@
 -module(http_cache).
 
 %% API exports
--export([get/2, notify_use/2, cache/3, invalidate_url/2, invalidate_by_alternate_key/2]).
+-export([get/2, notify_use/2, cache/3, cache/4, invalidate_url/2,
+         invalidate_by_alternate_key/2]).
 
 -export_type([alternate_key/0, headers/0, request_key/0, response/0, status/0,
               timestamp/0, vary_headers/0]).
@@ -96,7 +97,7 @@
 %%    Does not decompress responses with strong etags (see
 %%    [https://bz.apache.org/bugzilla/show_bug.cgi?id=63932]).
 %%
-%%    Used by {@link get/2}.  Defaults to `false'.
+%%    Used by {@link get/2} and {@link cache/3}.  Defaults to `false'.
 %%  </li>
 %%  <li>
 %%    `bucket': an Erlang term to differentiate between different caches. For instance,
@@ -223,6 +224,9 @@
 -define(TELEMETRY_INVALIDATION_EVT, [http_cache, invalidation]).
 -define(TELEMETRY_COMPRESS_EVT, [http_cache, compress_operation]).
 -define(TELEMETRY_DECOMPRESS_EVT, [http_cache, decompress_operation]).
+-define(is_no_transform(Headers),
+        (is_map_key(<<"cache-control">>, Headers)
+        andalso is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers)))).
 
 %%====================================================================
 %% API functions
@@ -305,12 +309,13 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
     case MaybeCandidate of
         {Freshness, {RespRef, _Status, _RespHeaders, _VaryHeaders, _RespMetadata}} ->
             case Store:get_response(RespRef) of
-                {_, _, _, _} = Response ->
+                {Status, RespHeaders, RespBody, RespMetadata} ->
                     postprocess_response(Freshness,
                                          Request,
                                          ParsedReqHeaders,
                                          RespRef,
-                                         Response,
+                                         {Status, RespHeaders, RespBody},
+                                         RespMetadata,
                                          StartTime,
                                          Measurements,
                                          Opts);
@@ -323,6 +328,7 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
                                  ParsedReqHeaders,
                                  undefined,
                                  undefined,
+                                 undefined,
                                  StartTime,
                                  Measurements,
                                  Opts)
@@ -330,37 +336,40 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
 
 postprocess_response(Freshness,
                      _Request,
-                     ParsedReqHeaders,
-                     RespRef,
-                     Resp,
+                     #{<<"cache-control">> := #{<<"only-if-cached">> := _}},
+                     _MaybeRespRef,
+                     _MaybeResponse,
+                     _RespMetadata,
                      StartTime,
                      Measurements,
                      _Opts)
     when Freshness == must_revalidate orelse Freshness == miss ->
-    Ret = case ParsedReqHeaders of
-              #{<<"cache-control">> := #{<<"only-if-cached">> := _}} ->
-                  {fresh, {undefined, {504, [], <<"">>}}};
-              _ ->
-                  case Freshness of
-                      must_revalidate ->
-                          {must_revalidate, {RespRef, Resp}};
-                      miss ->
-                          miss
-                  end
-          end,
     telemetry:execute(?TELEMETRY_LOOKUP_EVT,
                       maps:put(total_time, now_monotonic_us() - StartTime, Measurements),
                       #{freshness => Freshness}),
-    Ret;
+    {fresh, {undefined, {504, [], <<"">>}}};
+postprocess_response(miss,
+                     _Request,
+                     _ParsedReqHeaders,
+                     _RespRef,
+                     _Response0,
+                     _RespMetadata,
+                     StartTime,
+                     Measurements,
+                     _Opts) ->
+    telemetry:execute(?TELEMETRY_LOOKUP_EVT,
+                      maps:put(total_time, now_monotonic_us() - StartTime, Measurements),
+                      #{freshness => miss}),
+    miss;
 postprocess_response(Freshness,
                      Request,
                      ParsedReqHeaders,
                      RespRef,
-                     {Status, RespHeaders, Body, RespMetadata},
+                     Response0,
+                     RespMetadata,
                      StartTime,
                      Measurements,
                      Opts) ->
-    Response0 = {Status, RespHeaders, Body},
     case handle_conditions(Request, ParsedReqHeaders, Response0, RespMetadata) of
         {304, _, _} = Response1 ->
             telemetry:execute(?TELEMETRY_LOOKUP_EVT,
@@ -408,7 +417,7 @@ notify_use(RespRef, Opts) ->
 %% This function never returns an error, even when the backend store returns one.
 %% Instead it returns `{ok, response()}' when the response is cacheable (even
 %% if an error occurs to actually save it) or `not_cacheable' when the response
-%% cannot be cached. When `{ok, response()}' is returned, the response must be
+%% cannot be cached. When `{ok, response()}' is returned, the response should be
 %% returned to the client, because it can be modified depending on which options
 %% are enabled. For example, even an uncompressed text response must be returned
 %% with a `Vary: Content-Encoding' header when auto compression is enabled.
@@ -420,15 +429,53 @@ notify_use(RespRef, Opts) ->
 %% cacheable, such as those of a `DELETE' request, because such non-cacheable request
 %% can still have side effects on other cached objects
 %% (see [https://datatracker.ietf.org/doc/html/rfc7234#section-4.4]).
-%% In this example, a successful `DELETE' request must trigger the
-%% invalidation of cached results of the deleted object at the same URL.
+%% In this example, a successful `DELETE' request triggers the
+%% invalidation of cached results of the deleted object with the same URL.
 %%
 %% @end
 %%------------------------------------------------------------------------------
 
 -spec cache(request(), response(), opts()) -> {ok, response()} | not_cacheable.
+cache(Request, {304, _, _} = Response, Opts) ->
+    refresh_stored_responses(Request, Response, normalize_opts(Opts)),
+    {ok, Response};
 cache(Request, Response, Opts) ->
     analyze_cache(Request, Response, normalize_opts(Opts)).
+
+%%------------------------------------------------------------------------------
+%% @doc Caches a response when revalidating
+%%
+%% Similar to {@link cache/3}, but to be used when revalidating a response,
+%% when {@link get/2} return a `:must_revalidate' response. The `Response'
+%% parameter is the response received from the origin server, and the
+%% `RevalidatedResponse' parameter is the previously `:must_revalidate' response
+%% that is being revalidated.
+%%
+%% When the returned response is a `304' (not modified) response, stored
+%% responses are updated and a response is returned from the 2 responses passed
+%% as a parameter. This is because stored response can not always be used: the
+%% revalidated response may have been deleted since.
+%%
+%% Otherwise, {@link cache/3} is called.
+%%
+%% @end
+%%------------------------------------------------------------------------------
+
+-spec cache(Request :: request(),
+            Response :: response(),
+            RevalidatedResponse :: response(),
+            opts()) ->
+               {ok, response()} | not_cacheable.
+cache(Request,
+      {304, RespHeaders, _} = Response,
+      {Status, RevalidatedRespHeaders, RespBody},
+      Opts) ->
+    refresh_stored_responses(Request, Response, normalize_opts(Opts)),
+    UpdatedHeaders = update_headers(RevalidatedRespHeaders, RespHeaders),
+    %TODO: remove 1xx warnings
+    {Status, UpdatedHeaders, RespBody};
+cache(Request, Response, _, Opts) ->
+    cache(Request, Response, Opts).
 
 analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
               {Status, RespHeaders, _RespBody} = Response,
@@ -482,6 +529,7 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
          Measurements,
          #{auto_compress := true} = Opts)
     when not is_map_key(<<"content-encoding">>, ParsedRespHeaders0)
+         andalso not ?is_no_transform(ParsedRespHeaders0)
          andalso is_map_key({MainType, SubType}, ?DEFAULT_COMPRESS_MIME_TYPES)
          andalso % do not compress response with strong etag
                  % %TODO: use macro for this 3x guard?
@@ -674,7 +722,7 @@ varying_header_match(#{<<"accept-encoding">> := undefined},
                      #{auto_decompress := true})
     when not is_map_key(<<"etag">>, ParsedRespHeaders)
          orelse element(1, map_get(<<"etag">>, ParsedRespHeaders)) == weak ->
-    true;
+    not ?is_no_transform(ParsedRespHeaders);
 % we do not support multiple successive encodings
 varying_header_match(%TODO: use parsed request headers?
                      #{<<"accept-encoding">> := <<_/binary>> = AcceptEncoding},
@@ -1140,8 +1188,20 @@ handle_auto_decompress(ParsedReqHeaders,
 handle_auto_decompress(_ParsedReqHeaders, Response, _RespMetadata, _Opts) ->
     Response.
 
-% cowlib parse empty bytes without raising
+handle_range_request(_Request,
+                     #{<<"cache-control">> := #{<<"no-transform">> := _}},
+                     Response,
+                     _RespMetadata,
+                     _Opts) ->
+    Response;
+handle_range_request(_Request,
+                     _ParsedReqHeaders,
+                     Response,
+                     #{parsed_headers := #{<<"cache-control">> := #{<<"no-transform">> := _}}},
+                     _Opts) ->
+    Response;
 handle_range_request({<<"GET">>, _, _, _},
+                     % cowlib parse empty bytes without raising
                      #{<<"range">> := {bytes, []}},
                      Response,
                      _RespMetadata,
@@ -1358,6 +1418,92 @@ handle_failed_condition({Method, _Url, _ReqHeaders, _ReqBody},
      <<>>};
 handle_failed_condition(_Request, _Response) ->
     {412, [], <<>>}.
+
+refresh_stored_responses(Request, {304, RespHeaders, _}, #{store := Store} = Opts) ->
+    RequestKey = request_key(Request, Opts),
+    Candidates = Store:list_candidates(RequestKey),
+    ParsedRespHeaders = parse_headers(RespHeaders, [<<"etag">>, <<"last-modified">>]),
+    CandidatesToUpdate = select_candidates_to_update(Candidates, ParsedRespHeaders),
+    update_candidates(Request, CandidatesToUpdate, RespHeaders, Opts).
+
+select_candidates_to_update(Candidates, #{<<"etag">> := {strong, _} = ETag}) ->
+    lists:filter(fun ({_, _, _, _, #{parsed_headers := #{<<"etag">> := CandidateETag}}})
+                         when CandidateETag == ETag ->
+                         true;
+                     (_) ->
+                         false
+                 end,
+                 Candidates);
+select_candidates_to_update(Candidates, #{<<"etag">> := {weak, _} = ETag}) ->
+    case lists:filter(fun ({_, _, _, _, #{parsed_headers := #{<<"etag">> := CandidateETag}}})
+                              when CandidateETag == ETag ->
+                              true;
+                          (_) ->
+                              false
+                      end,
+                      Candidates)
+    of
+        [] ->
+            [];
+        SelectedCandidates ->
+            [most_recent_candidate(SelectedCandidates)]
+    end;
+select_candidates_to_update(Candidates, #{<<"last-modified">> := LastModified}) ->
+    case lists:filter(fun ({_,
+                            _,
+                            _,
+                            _,
+                            #{parsed_headers := #{<<"last-modified">> := CandidateLastModified}}})
+                              when CandidateLastModified == LastModified ->
+                              true;
+                          (_) ->
+                              false
+                      end,
+                      Candidates)
+    of
+        [] ->
+            [];
+        SelectedCandidates ->
+            [most_recent_candidate(SelectedCandidates)]
+    end;
+select_candidates_to_update([{_, _, _, _, #{parsed_headers := ParsedHeaders}} =
+                                 Candidate],
+                            _)
+    when not
+             (is_map_key(<<"etag">>, ParsedHeaders)
+              orelse is_map_key(<<"last-modified">>, ParsedHeaders)) ->
+    [Candidate];
+select_candidates_to_update(_, _) ->
+    [].
+
+most_recent_candidate([]) ->
+    undefined;
+most_recent_candidate(Candidates) ->
+    element(2,
+            lists:max([{CreatedAt, Candidate}
+                       || {_, _, _, _, #{created := CreatedAt}} = Candidate <- Candidates])).
+
+update_candidates(Request, Candidates, RespHeaders, #{store := Store} = Opts) ->
+    lists:map(fun({RespRef, _, _, _, _}) ->
+                 case Store:get_response(RespRef) of
+                     %TODO: handle body response
+                     %TODO: handle setting alt keys
+                     {Status, StoredRespHeaders, BodyOrFile, _} ->
+                         UpdatedRespHeaders = update_headers(StoredRespHeaders, RespHeaders),
+                         analyze_cache(Request, {Status, UpdatedRespHeaders, BodyOrFile}, Opts);
+                     undefined ->
+                         ok
+                 end
+              end,
+              Candidates).
+
+update_headers(OldHeaders, NewHeaders) ->
+    HeadersToUpdate = sets:from_list([?LOWER(HeaderName) || {HeaderName, _} <- NewHeaders]),
+    lists:filter(fun({HeaderName, _}) ->
+                    not sets:is_element(?LOWER(HeaderName), HeadersToUpdate)
+                 end,
+                 OldHeaders)
+    ++ NewHeaders.
 
 parse_headers(Headers, Which) ->
     parse_headers(Headers, maps:from_keys(Which, []), #{}).
