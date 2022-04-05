@@ -1502,8 +1502,6 @@ select_candidates_to_update([{_, _, _, _, #{parsed_headers := ParsedHeaders}} =
 select_candidates_to_update(_, _) ->
     [].
 
-most_recent_candidate([]) ->
-    undefined;
 most_recent_candidate(Candidates) ->
     element(2,
             lists:max([{CreatedAt, Candidate}
@@ -1543,11 +1541,21 @@ is_updatable_by_head_resp(_, _) ->
 update_candidates(Request, Candidates, RespHeaders, #{store := Store} = Opts) ->
     lists:map(fun({RespRef, _, _, _, _}) ->
                  case Store:get_response(RespRef) of
-                     %TODO: handle body response
                      %TODO: handle setting alt keys
-                     {Status, StoredRespHeaders, BodyOrFile, _} ->
+                     {Status, StoredRespHeaders, {file, Filename}, _} ->
+                      case file:read_file(Filename) of
+                        {ok, RespBody} ->
+                           UpdatedRespHeaders = update_headers(StoredRespHeaders, RespHeaders),
+                           analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, Opts);
+
+                           {error, _} ->
+                          ok
+                      end;
+
+                     {Status, StoredRespHeaders, RespBody, _} ->
                          UpdatedRespHeaders = update_headers(StoredRespHeaders, RespHeaders),
-                         analyze_cache(Request, {Status, UpdatedRespHeaders, BodyOrFile}, Opts);
+                         analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, Opts);
+
                      undefined ->
                          ok
                  end
@@ -1557,12 +1565,22 @@ update_candidates(Request, Candidates, RespHeaders, #{store := Store} = Opts) ->
 invalidate_candidates(Request, Candidates, #{store := Store} = Opts) ->
     lists:map(fun({RespRef, _, _, _, _}) ->
                  case Store:get_response(RespRef) of
-                     %TODO: handle body response
                      %TODO: handle setting alt keys
-                     {Status, RespHeaders, BodyOrFile, _} ->
+                     {Status, RespHeaders, {file, Filename}, _} ->
+                      case file:read_file(Filename) of
+                        {ok, RespBody} ->
+                           Now = timestamp_to_rfc7231(unix_now()),
+                           UpdatedRespHeaders = set_header_value(<<"expires">>, Now, RespHeaders),
+                           analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, Opts);
+
+                           {error, _} ->
+                          ok
+                      end;
+
+                     {Status, RespHeaders, RespBody, _} ->
                          Now = timestamp_to_rfc7231(unix_now()),
                          UpdatedRespHeaders = set_header_value(<<"expires">>, Now, RespHeaders),
-                         analyze_cache(Request, {Status, UpdatedRespHeaders, BodyOrFile}, Opts);
+                         analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, Opts);
                      undefined ->
                          ok
                  end
