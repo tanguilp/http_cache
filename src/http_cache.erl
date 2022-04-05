@@ -436,6 +436,10 @@ notify_use(RespRef, Opts) ->
 %%------------------------------------------------------------------------------
 
 -spec cache(request(), response(), opts()) -> {ok, response()} | not_cacheable.
+cache({<<"HEAD">>, _, _, _} = Request, {200, _, _} = Response, Opts) ->
+    NormOpts = normalize_opts(Opts),
+    refresh_stored_responses(Request, Response, NormOpts),
+    analyze_cache(Request, Response, NormOpts);
 cache(Request, {304, _, _} = Response, Opts) ->
     refresh_stored_responses(Request, Response, normalize_opts(Opts)),
     {ok, Response};
@@ -574,11 +578,12 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
     VaryHeaders = vary_headers(ReqHeaders0, ParsedRespHeaders),
     MaybeAge = maps:get(<<"age">>, ParsedRespHeaders, undefined),
     MaybeDate = maps:get(<<"date">>, ParsedRespHeaders, undefined),
-    {TTLSetBy, Expires} = expires(MaybeDate, ParsedRespHeaders, Opts),
+    CreatedAt = created_at(MaybeAge, MaybeDate, Opts),
+    {TTLSetBy, Expires} = expires(CreatedAt, MaybeDate, ParsedRespHeaders, Opts),
     UrlDigest = url_digest(Url, Opts),
     Response = {Status, RespHeaders1, RespBodyBin},
     RespMetadata =
-        #{created => created_at(MaybeAge, MaybeDate, Opts),
+        #{created => CreatedAt,
           expires => Expires,
           grace => grace(Expires, Opts),
           ttl_set_by => TTLSetBy,
@@ -1146,21 +1151,27 @@ apparent_age(undefined) ->
 corrected_age_value(Age, #{request_time := RequestTime}) when is_integer(Age) ->
     ResponseDelay = unix_now() - RequestTime,
     Age + ResponseDelay;
+corrected_age_value(Age, _Opts) when is_integer(Age) ->
+    Age;
 corrected_age_value(_, _Opts) ->
     undefined.
 
-expires(_MaybeDate,
+expires(CreatedAt,
+        _MaybeDate,
         #{<<"cache-control">> := #{<<"s-maxage">> := SMaxAge}},
         #{type := shared}) ->
-    {header, unix_now() + SMaxAge};
-expires(_MaybeDate, #{<<"cache-control">> := #{<<"max-age">> := MaxAge}}, _Opts) ->
-    {header, unix_now() + MaxAge};
-expires(Date, #{<<"expires">> := Expires}, _Opts) when is_integer(Date) ->
-    {header, unix_now() + Expires - Date};
-expires(_MaybeDate, #{<<"expires">> := Expires}, _Opts) ->
+    {header, CreatedAt + SMaxAge};
+expires(CreatedAt,
+        _MaybeDate,
+        #{<<"cache-control">> := #{<<"max-age">> := MaxAge}},
+        _Opts) ->
+    {header, CreatedAt + MaxAge};
+expires(CreatedAt, Date, #{<<"expires">> := Expires}, _Opts) when is_integer(Date) ->
+    {header, CreatedAt + Expires - Date};
+expires(_CreatedAt, _MaybeDate, #{<<"expires">> := Expires}, _Opts) ->
     {header, Expires};
-expires(_MaybeDate, _ParsedRespHeaders, #{default_ttl := DefaultTTL}) ->
-    {heuristics, unix_now() + DefaultTTL}.
+expires(CreatedAt, _MaybeDate, _ParsedRespHeaders, #{default_ttl := DefaultTTL}) ->
+    {heuristics, CreatedAt + DefaultTTL}.
 
 grace(Expires, #{default_grace := Grace}) ->
     Expires + Grace.
@@ -1424,7 +1435,22 @@ refresh_stored_responses(Request, {304, RespHeaders, _}, #{store := Store} = Opt
     Candidates = Store:list_candidates(RequestKey),
     ParsedRespHeaders = parse_headers(RespHeaders, [<<"etag">>, <<"last-modified">>]),
     CandidatesToUpdate = select_candidates_to_update(Candidates, ParsedRespHeaders),
-    update_candidates(Request, CandidatesToUpdate, RespHeaders, Opts).
+    update_candidates(Request, CandidatesToUpdate, RespHeaders, Opts);
+refresh_stored_responses({<<"HEAD">>, Url, ReqHeaders, ReqBody},
+                         {200, RespHeaders, _},
+                         #{store := Store} = Opts) ->
+    RequestKey = request_key({<<"GET">>, Url, ReqHeaders, ReqBody}, Opts),
+    Candidates = Store:list_candidates(RequestKey),
+    ParsedRespHeaders =
+        parse_headers(RespHeaders, [<<"etag">>, <<"last-modified">>, <<"content-length">>]),
+    CandidatesToUpdate =
+        lists:filter(fun(Candidate) -> is_updatable_by_head_resp(Candidate, ParsedRespHeaders)
+                     end,
+                     Candidates),
+    CandidatesToInvalidate = Candidates -- CandidatesToUpdate,
+    GetRequest = {<<"GET">>, Url, ReqHeaders, ReqBody},
+    update_candidates(GetRequest, CandidatesToUpdate, RespHeaders, Opts),
+    invalidate_candidates(GetRequest, CandidatesToInvalidate, Opts).
 
 select_candidates_to_update(Candidates, #{<<"etag">> := {strong, _} = ETag}) ->
     lists:filter(fun ({_, _, _, _, #{parsed_headers := #{<<"etag">> := CandidateETag}}})
@@ -1483,6 +1509,37 @@ most_recent_candidate(Candidates) ->
             lists:max([{CreatedAt, Candidate}
                        || {_, _, _, _, #{created := CreatedAt}} = Candidate <- Candidates])).
 
+is_updatable_by_head_resp({_,
+                           _,
+                           _,
+                           _,
+                           #{parsed_headers :=
+                                 #{<<"etag">> := Etag, <<"content-length">> := ContentLength}}},
+                          #{<<"etag">> := Etag, <<"content-length">> := ContentLength}) ->
+    true;
+is_updatable_by_head_resp({_, _, _, _, #{parsed_headers := #{<<"etag">> := Etag}}},
+                          #{<<"etag">> := Etag}) ->
+    true;
+is_updatable_by_head_resp({_,
+                           _,
+                           _,
+                           _,
+                           #{parsed_headers :=
+                                 #{<<"last-modified">> := LastModified,
+                                   <<"content-length">> := ContentLength}}},
+                          #{<<"last-modified">> := LastModified,
+                            <<"content-length">> := ContentLength}) ->
+    true;
+is_updatable_by_head_resp({_,
+                           _,
+                           _,
+                           _,
+                           #{parsed_headers := #{<<"last-modified">> := LastModified}}},
+                          #{<<"last-modified">> := LastModified}) ->
+    true;
+is_updatable_by_head_resp(_, _) ->
+    false.
+
 update_candidates(Request, Candidates, RespHeaders, #{store := Store} = Opts) ->
     lists:map(fun({RespRef, _, _, _, _}) ->
                  case Store:get_response(RespRef) of
@@ -1490,6 +1547,21 @@ update_candidates(Request, Candidates, RespHeaders, #{store := Store} = Opts) ->
                      %TODO: handle setting alt keys
                      {Status, StoredRespHeaders, BodyOrFile, _} ->
                          UpdatedRespHeaders = update_headers(StoredRespHeaders, RespHeaders),
+                         analyze_cache(Request, {Status, UpdatedRespHeaders, BodyOrFile}, Opts);
+                     undefined ->
+                         ok
+                 end
+              end,
+              Candidates).
+
+invalidate_candidates(Request, Candidates, #{store := Store} = Opts) ->
+    lists:map(fun({RespRef, _, _, _, _}) ->
+                 case Store:get_response(RespRef) of
+                     %TODO: handle body response
+                     %TODO: handle setting alt keys
+                     {Status, RespHeaders, BodyOrFile, _} ->
+                         Now = timestamp_to_rfc7231(unix_now()),
+                         UpdatedRespHeaders = set_header_value(<<"expires">>, Now, RespHeaders),
                          analyze_cache(Request, {Status, UpdatedRespHeaders, BodyOrFile}, Opts);
                      undefined ->
                          ok
@@ -1633,3 +1705,7 @@ unix_now() ->
 
 now_monotonic_us() ->
     erlang:monotonic_time(microsecond).
+
+timestamp_to_rfc7231(Timestamp) ->
+    DateTime = calendar:gregorian_seconds_to_datetime(Timestamp + 62167219200),
+    cow_date:rfc7231(DateTime).

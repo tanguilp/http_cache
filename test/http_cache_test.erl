@@ -59,6 +59,15 @@ http_cache_test_() ->
       fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidation/1,
       fun rfc7234_section_4_3_4_cached_response_updated_with_no_validator/1,
       fun rfc7234_section_4_3_4_cached_response_updated_with_no_validator_revalidation/1,
+      fun rfc7234_section_4_3_5_cached_response_updated_with_etag_matching/1,
+      fun rfc7234_section_4_3_5_cached_response_updated_with_etag_matching_and_content_length/1,
+      fun rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching/1,
+      fun rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching_and_content_length/1,
+      fun rfc7234_section_4_3_5_cached_response_invalidated_no_validator/1,
+      fun rfc7234_section_4_3_5_cached_response_invalidated_no_validator_get_resp/1,
+      fun rfc7234_section_4_3_5_cached_response_invalidated_no_validator_head_resp/1,
+      fun rfc7234_section_4_3_5_cached_response_invalidated_content_length_mismatch/1,
+      fun rfc7234_section_4_3_5_ignore_when_status_code_is_not_200/1,
       fun rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status/1,
       fun rfc7234_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status/1,
       %TODO
@@ -403,7 +412,7 @@ opt_request_time(Opts) ->
     F = fun() ->
            http_cache:cache(Req,
                             {200, [{<<"Age">>, <<"2">>}], <<"Some content">>},
-                            [{request_time, Now - 3} | Opts]),
+                            set_opt(request_time, Now - 3, Opts)),
            {fresh, {_, {_, Headers, _}}} = http_cache:get(Req, Opts),
            proplists:get_value(<<"age">>, Headers)
         end,
@@ -610,7 +619,7 @@ rfc7234_section_4_age_resp_header_generated(Opts) ->
                http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts),
            proplists:get_all_values(<<"age">>, RespHeaders)
         end,
-    {spawn, ?_assertEqual([<<"0">>], F())}.
+    {spawn, ?_assertEqual([<<"42">>], F())}.
 
 rfc7234_section_4_most_recent_resp(Opts) ->
     % Actually they are the same request (same request key) so the second will erase the
@@ -1448,6 +1457,220 @@ rfc7234_section_4_3_4_cached_response_updated_with_no_validator_revalidation(Opt
                            proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                        end)}].
 
+rfc7234_section_4_3_5_cached_response_updated_with_etag_matching(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200, [{<<"etag">>, <<"\"strong-etag\"">>}], <<"Some content">>},
+                            Opts),
+           http_cache:cache({<<"HEAD">>, ?TEST_URL, [], <<"">>},
+                            {200,
+                             [{<<"etag">>, <<"\"strong-etag\"">>}, {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_5_cached_response_updated_with_etag_matching_and_content_length(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"etag">>, <<"\"strong-etag\"">>},
+                              {<<"content-length">>, <<"12">>}],
+                             <<"Some content">>},
+                            Opts),
+           http_cache:cache({<<"HEAD">>, ?TEST_URL, [], <<"">>},
+                            {200,
+                             [{<<"etag">>, <<"\"strong-etag\"">>},
+                              {<<"content-length">>, <<"12">>},
+                              {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    LastModified = timestamp_to_rfc7231(unix_now()),
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200, [{<<"last-modified">>, LastModified}], <<"Some content">>},
+                            Opts),
+           http_cache:cache({<<"HEAD">>, ?TEST_URL, [], <<"">>},
+                            {200,
+                             [{<<"last-modified">>, LastModified}, {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn,
+      ?_assertEqual(<<"a">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                    end)},
+     {spawn,
+      ?_assertEqual(<<"0">>,
+                    begin
+                        {_, {_, {_, RespHeaders, _}}} = F(),
+                        proplists:get_value(<<"age">>, RespHeaders, undefined)
+                    end)}].
+
+rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching_and_content_length(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    LastModified = timestamp_to_rfc7231(unix_now()),
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"last-modified">>, LastModified},
+                              {<<"content-length">>, <<"12">>}],
+                             <<"Some content">>},
+                            Opts),
+           http_cache:cache({<<"HEAD">>, ?TEST_URL, [], <<"">>},
+                            {200,
+                             [{<<"last-modified">>, LastModified},
+                              {<<"content-length">>, <<"12">>},
+                              {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    {spawn,
+     ?_assertEqual(<<"a">>,
+                   begin
+                       {_, {_, {_, RespHeaders, _}}} = F(),
+                       proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                   end)}.
+
+rfc7234_section_4_3_5_cached_response_invalidated_no_validator(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req, {200, [], <<"Some content">>}, Opts),
+           http_cache:cache({<<"HEAD">>, ?TEST_URL, [{<<"test-header">>, <<"a">>}], <<"">>},
+                            {200, [], <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    {spawn,
+     ?_assertNotMatch(<<"a">>,
+                      begin
+                          {must_revalidate, {_, {_, RespHeaders, _}}} = F(),
+                          proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                      end)}.
+
+rfc7234_section_4_3_5_cached_response_invalidated_no_validator_get_resp(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req, {200, [], <<"Some content">>}, Opts),
+           http_cache:cache({<<"HEAD">>,
+                             ?TEST_URL,
+                             [{<<"etag">>, <<"\"strong-etag\"">>},
+                              {<<"last-modified">>, timestamp_to_rfc7231(unix_now())},
+                              {<<"test-header">>, <<"a">>}],
+                             <<"">>},
+                            {200, [], <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    {spawn,
+     ?_assertNotMatch(<<"a">>,
+                      begin
+                          {must_revalidate, {_, {_, RespHeaders, _}}} = F(),
+                          proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                      end)}.
+
+rfc7234_section_4_3_5_cached_response_invalidated_no_validator_head_resp(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"etag">>, <<"\"strong-etag\"">>},
+                              {<<"last-modified">>, timestamp_to_rfc7231(unix_now())}],
+                             <<"Some content">>},
+                            Opts),
+           http_cache:cache({<<"HEAD">>, ?TEST_URL, [{<<"test-header">>, <<"a">>}], <<"">>},
+                            {200, [], <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    {spawn,
+     ?_assertNotMatch(<<"a">>,
+                      begin
+                          {must_revalidate, {_, {_, RespHeaders, _}}} = F(),
+                          proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                      end)}.
+
+rfc7234_section_4_3_5_cached_response_invalidated_content_length_mismatch(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"etag">>, <<"\"strong-etag\"">>}, {<<"content-length">>, <<"3">>}],
+                             <<"abc">>},
+                            Opts),
+           http_cache:cache({<<"HEAD">>,
+                             ?TEST_URL,
+                             [{<<"etag">>, <<"\"strong-etag\"">>},
+                              {<<"content-length">>, <<"4">>},
+                              {<<"test-header">>, <<"a">>}],
+                             <<"">>},
+                            {200, [], <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    {spawn,
+     ?_assertNotMatch(<<"a">>,
+                      begin
+                          {must_revalidate, {_, {_, RespHeaders, _}}} = F(),
+                          proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                      end)}.
+
+rfc7234_section_4_3_5_ignore_when_status_code_is_not_200(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200, [{<<"etag">>, <<"\"strong-etag\"">>}], <<"Some content">>},
+                            Opts),
+           http_cache:cache({<<"HEAD">>, ?TEST_URL, [], <<"">>},
+                            {404,
+                             [{<<"etag">>, <<"\"strong-etag\"">>}, {<<"test-header">>, <<"a">>}],
+                             <<>>},
+                            Opts),
+           http_cache:get(Req, Opts)
+        end,
+    [{spawn, ?_assertMatch({fresh, _}, F())},
+     {spawn,
+      ?_assertNotEqual(<<"a">>,
+                       begin
+                           {_, {_, {_, RespHeaders, _}}} = F(),
+                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
+                       end)}].
+
 rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status(Opts) ->
     URI = ?TEST_URL,
     OtherURI = <<"http://example.com/somewhere/else">>,
@@ -2204,8 +2427,8 @@ rfc7233_no_satisfiable_range_content_range_header(Opts) ->
 
 init() ->
     application:ensure_all_started(telemetry),
-    [{default_ttl, 10},
-     {default_grace, 10},
+    [{default_ttl, 300},
+     {default_grace, 300},
      {store, http_cache_store_process},
      {type, shared}].
 
