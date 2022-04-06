@@ -8,7 +8,8 @@
       grace := http_cache:timestamp(),
       ttl_set_by := header | heuristics,
       parsed_headers := #{binary() => term()},
-      alternate_keys := [http_cache:alternate_key()]}.
+      alternate_keys := [http_cache:alternate_key()],
+      compressed_by_this_lib := boolean()}.
 -type body() :: binary().
 
              % The body transmitted to the backend is a binary so as to optimize copying around
