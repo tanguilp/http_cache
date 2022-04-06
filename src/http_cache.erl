@@ -588,12 +588,10 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
           grace => grace(Expires, Opts),
           ttl_set_by => TTLSetBy,
           %TODO: keep only those which are really needed
-          parsed_headers => ParsedRespHeaders},
-    AlternateKeys = map_get(alternate_keys, Opts),
+          parsed_headers => ParsedRespHeaders,
+          alternate_keys => map_get(alternate_keys, Opts)},
     {StoreDur, StoreRes} =
-        timer:tc(Store,
-                 put,
-                 [RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata, AlternateKeys]),
+        timer:tc(Store, put, [RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata]),
     case StoreRes of
         %TODO: logging
         ok ->
@@ -1435,7 +1433,7 @@ refresh_stored_responses(Request, {304, RespHeaders, _}, #{store := Store} = Opt
     Candidates = Store:list_candidates(RequestKey),
     ParsedRespHeaders = parse_headers(RespHeaders, [<<"etag">>, <<"last-modified">>]),
     CandidatesToUpdate = select_candidates_to_update(Candidates, ParsedRespHeaders),
-    update_candidates(Request, CandidatesToUpdate, RespHeaders, Opts);
+    update_candidates(CandidatesToUpdate, Request, RespHeaders, update_headers, Opts);
 refresh_stored_responses({<<"HEAD">>, Url, ReqHeaders, ReqBody},
                          {200, RespHeaders, _},
                          #{store := Store} = Opts) ->
@@ -1449,8 +1447,8 @@ refresh_stored_responses({<<"HEAD">>, Url, ReqHeaders, ReqBody},
                      Candidates),
     CandidatesToInvalidate = Candidates -- CandidatesToUpdate,
     GetRequest = {<<"GET">>, Url, ReqHeaders, ReqBody},
-    update_candidates(GetRequest, CandidatesToUpdate, RespHeaders, Opts),
-    invalidate_candidates(GetRequest, CandidatesToInvalidate, Opts).
+    update_candidates(CandidatesToUpdate, GetRequest, RespHeaders, update_headers, Opts),
+    update_candidates(CandidatesToInvalidate, GetRequest, RespHeaders, invalidate, Opts).
 
 select_candidates_to_update(Candidates, #{<<"etag">> := {strong, _} = ETag}) ->
     lists:filter(fun ({_, _, _, _, #{parsed_headers := #{<<"etag">> := CandidateETag}}})
@@ -1538,54 +1536,42 @@ is_updatable_by_head_resp({_,
 is_updatable_by_head_resp(_, _) ->
     false.
 
-update_candidates(Request, Candidates, RespHeaders, #{store := Store} = Opts) ->
-    lists:map(fun({RespRef, _, _, _, _}) ->
-                 case Store:get_response(RespRef) of
-                     %TODO: handle setting alt keys
-                     {Status, StoredRespHeaders, {file, Filename}, _} ->
-                      case file:read_file(Filename) of
-                        {ok, RespBody} ->
-                           UpdatedRespHeaders = update_headers(StoredRespHeaders, RespHeaders),
-                           analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, Opts);
+update_candidates([], _Request, _RespHeaders, _Type, _Opts) ->
+    ok;
+update_candidates([{RespRef, _, _, _, #{alternate_keys := AltKeys}} | Rest],
+                  Request,
+                  RespHeaders,
+                  Type,
+                  #{store := Store} = Opts) ->
+    try
+        {Status, StoredRespHeaders, FileOrBody, _} = Store:get_response(RespRef),
 
-                           {error, _} ->
-                          ok
-                      end;
+        RespBody =
+            case FileOrBody of
+                {file, Filename} ->
+                    {ok, Content} = file:read_file(Filename),
+                    Content;
+                Other ->
+                    Other
+            end,
 
-                     {Status, StoredRespHeaders, RespBody, _} ->
-                         UpdatedRespHeaders = update_headers(StoredRespHeaders, RespHeaders),
-                         analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, Opts);
+        UpdatedRespHeaders =
+            case Type of
+                update_headers ->
+                    update_headers(StoredRespHeaders, RespHeaders);
+                invalidate ->
+                    Now = timestamp_to_rfc7231(unix_now()),
+                    set_header_value(<<"expires">>, Now, RespHeaders)
+            end,
 
-                     undefined ->
-                         ok
-                 end
-              end,
-              Candidates).
+        UpdatedOpts = maps:put(alternate_keys, AltKeys, Opts),
 
-invalidate_candidates(Request, Candidates, #{store := Store} = Opts) ->
-    lists:map(fun({RespRef, _, _, _, _}) ->
-                 case Store:get_response(RespRef) of
-                     %TODO: handle setting alt keys
-                     {Status, RespHeaders, {file, Filename}, _} ->
-                      case file:read_file(Filename) of
-                        {ok, RespBody} ->
-                           Now = timestamp_to_rfc7231(unix_now()),
-                           UpdatedRespHeaders = set_header_value(<<"expires">>, Now, RespHeaders),
-                           analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, Opts);
-
-                           {error, _} ->
-                          ok
-                      end;
-
-                     {Status, RespHeaders, RespBody, _} ->
-                         Now = timestamp_to_rfc7231(unix_now()),
-                         UpdatedRespHeaders = set_header_value(<<"expires">>, Now, RespHeaders),
-                         analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, Opts);
-                     undefined ->
-                         ok
-                 end
-              end,
-              Candidates).
+        analyze_cache(Request, {Status, UpdatedRespHeaders, RespBody}, UpdatedOpts)
+    catch
+        _:_ ->
+            ok
+    end,
+    update_candidates(Rest, Request, RespHeaders, Type, Opts).
 
 update_headers(OldHeaders, NewHeaders) ->
     HeadersToUpdate = sets:from_list([?LOWER(HeaderName) || {HeaderName, _} <- NewHeaders]),

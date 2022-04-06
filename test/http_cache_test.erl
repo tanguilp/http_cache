@@ -21,7 +21,8 @@ http_cache_test_() ->
       fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
       fun opt_auto_decompress_strong_etags/1, fun opt_bucket/1, fun opt_origin_unreachable/1,
       fun opt_default_ttl/1, fun opt_ignore_query_params_order/1, fun opt_type/1,
-      fun opt_request_time/1, fun rfc7234_section_3_method_cacheable/1,
+      fun opt_request_time/1, fun invalidate_url/1, fun invalidate_by_alternate_key/1,
+      fun invalidate_by_alternate_keys/1, fun rfc7234_section_3_method_cacheable/1,
       fun rfc7234_section_3_nostore_absent/1, fun rfc7234_section_3_private_absent/1,
       fun rfc7234_section_3_authz_header/1, fun rfc7234_section_3_resp_has_expires_ccdir/1,
       fun rfc7234_section_3_resp_has_maxage_ccdir/1,
@@ -417,6 +418,40 @@ opt_request_time(Opts) ->
            proplists:get_value(<<"age">>, Headers)
         end,
     {spawn, ?_assertEqual(<<"5">>, F())}.
+
+invalidate_url(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    F = fun() ->
+           http_cache:cache(Req, {200, [], <<"Some content">>}, Opts),
+           http_cache:invalidate_url(?TEST_URL, Opts),
+           http_cache:get(Req, Opts)
+        end,
+    {spawn, ?_assertEqual(miss, F())}.
+
+invalidate_by_alternate_key(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    AltKey = {any, [#{term => works}]},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200, [], <<"Some content">>},
+                            set_opt(alternate_keys, [AltKey], Opts)),
+           http_cache:invalidate_by_alternate_key(AltKey, Opts),
+           http_cache:get(Req, Opts)
+        end,
+    {spawn, ?_assertEqual(miss, F())}.
+
+invalidate_by_alternate_keys(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    AltKey = {any, [#{term => works}]},
+    F = fun() ->
+           http_cache:cache(Req,
+                            {200, [], <<"Some content">>},
+                            set_opt(alternate_keys, [AltKey], Opts)),
+           http_cache:invalidate_by_alternate_key([<<"some key">>, AltKey, <<"some other key">>],
+                                                  Opts),
+           http_cache:get(Req, Opts)
+        end,
+    {spawn, ?_assertEqual(miss, F())}.
 
 rfc7234_section_3_method_cacheable(Opts) ->
     [?_assertMatch({ok, _},

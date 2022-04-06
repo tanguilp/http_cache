@@ -7,7 +7,8 @@
       expires := http_cache:timestamp(),
       grace := http_cache:timestamp(),
       ttl_set_by := header | heuristics,
-      parsed_headers := #{binary() => term()}}.
+      parsed_headers := #{binary() => term()},
+      alternate_keys := [http_cache:alternate_key()]}.
 -type body() :: binary().
 
              % The body transmitted to the backend is a binary so as to optimize copying around
@@ -33,8 +34,7 @@
               UrlDigest :: url_digest(),
               VaryHeaders :: http_cache:vary_headers(),
               Response :: http_cache:response(),
-              RespMetadata :: response_metadata(),
-              AltKeys :: [http_cache:alternate_key()]) ->
+              RespMetadata :: response_metadata()) ->
                  ok | {error, term()}.
 -callback invalidate_url(UrlDigest :: url_digest()) -> http_cache:invalidation_result().
 -callback notify_resp_used(RespRef :: response_ref(), Time :: http_cache:timestamp()) ->
