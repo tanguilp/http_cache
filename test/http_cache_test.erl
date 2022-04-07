@@ -91,7 +91,7 @@ http_cache_test_() ->
       fun rfc7234_section_5_3_header_expires_malformed/1,
       fun rfc7234_section_5_3_header_expires/1, fun rfc7234_section_5_4_header_pragma/1,
       fun rfc7234_section_5_5_1_response_is_stale/1,
-      %fun rfc7234_section_5_5_2_warning_revalidation_failed/1,
+      fun rfc7234_section_5_5_2_warning_revalidation_failed/1,
       fun rfc7234_section_5_5_4_warning_heuristics_expiration/1,
       fun rfc7234_section_5_5_6_plain_compressed/1,
       fun rfc7234_section_5_5_6_already_compressed/1,

@@ -220,6 +220,7 @@
           max_ranges => 100,
           type => shared}).
 -define(GZIP_MAGIC_BYTES, 31, 139).
+-define(PDICT_MEASUREMENTS, http_cache_measurments).
 -define(TELEMETRY_LOOKUP_EVT, [http_cache, lookup]).
 -define(TELEMETRY_CACHE_EVT, [http_cache, cache]).
 -define(TELEMETRY_INVALIDATION_EVT, [http_cache, invalidation]).
@@ -284,7 +285,25 @@
              {must_revalidate, {response_ref(), response()}} |
              miss.
 get(Request, Opts) ->
-    do_get(Request, normalize_opts(Opts)).
+  try
+    do_get(Request, normalize_opts(Opts))
+  catch resp_body_no_longer_available ->
+    % The response was deleted from the backend between analysis time and fetch time.
+    % This might be because a more up to date response was uploaded into the cache.
+    % We retry 3 times before returning miss
+    case get(http_cache_get_attempt_count) of
+      undefined ->
+        put(http_cache_get_attempt_count, 1),
+        get(Request, Opts);
+
+      NbAttempts when NbAttempts =< 3 ->
+        put(http_cache_get_attempt_count, NbAttempts + 1),
+        get(Request, Opts);
+
+      _ ->
+        miss
+    end
+  end.
 
 do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts) ->
     StartTime = now_monotonic_us(),
@@ -321,7 +340,7 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
                                          Measurements,
                                          Opts);
                 undefined ->
-                    throw(resp_body_not_accessible)
+                    throw(resp_body_no_longer_available)
             end;
         undefined ->
             postprocess_response(miss,
@@ -498,6 +517,7 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
                        <<"last-modified">>,
                        <<"pragma">>,
                        <<"vary">>]),
+    % A POST request that triggers invalidation cannot be cacheable
     case must_invalidate_request_uri(Request, Response, ParsedRespHeaders) of
         true ->
             handle_invalidation_of_unsafe_method(Request, RespHeaders, Opts),
@@ -1187,6 +1207,7 @@ handle_auto_decompress(ParsedReqHeaders,
                              #{<<"content-encoding">> := [<<"gzip">>]} = ParsedRespHeaders,
                          compressed_by_this_lib := CompressedByThisLib},
                        #{auto_decompress := true})
+    % TODO: what if accept-encoding only supports identity?
     when not is_map_key(<<"accept-encoding">>, ParsedReqHeaders)
          andalso % no decompressing of responses with strong validator
                  (not is_map_key(<<"etag">>, ParsedRespHeaders)
@@ -1285,7 +1306,7 @@ resp_body_byte_size({_, _, {file, FilePath}}) ->
         {ok, FileInfo} ->
             FileInfo#file_info.size;
         _ ->
-            throw(resp_body_not_accessible)
+            throw(resp_body_no_longer_available)
     end.
 
 normalize_range_spec(RangeSpec, BodySize) ->
@@ -1323,10 +1344,10 @@ get_range_chunks(NormByteRangeSpec, {_, _, {file, Filename}}) ->
                     lists:zip(NormByteRangeSpec, Chunks);
                 {error, _} ->
                     file:close(File),
-                    throw(resp_body_not_accessible)
+                    throw(resp_body_no_longer_available)
             end;
         {error, _} ->
-            throw(resp_body_not_accessible)
+            throw(resp_body_no_longer_available)
     end;
 get_range_chunks(NormByteRangeSpec, {_, _, Body}) ->
     [{Range, binary:part(Body, StartOffset, Length)}
