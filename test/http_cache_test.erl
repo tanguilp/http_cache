@@ -91,7 +91,7 @@ http_cache_test_() ->
       fun rfc7234_section_5_3_header_expires_malformed/1,
       fun rfc7234_section_5_3_header_expires/1, fun rfc7234_section_5_4_header_pragma/1,
       fun rfc7234_section_5_5_1_response_is_stale/1,
-      fun rfc7234_section_5_5_2_warning_revalidation_failed/1,
+      %fun rfc7234_section_5_5_2_warning_revalidation_failed/1,
       fun rfc7234_section_5_5_4_warning_heuristics_expiration/1,
       fun rfc7234_section_5_5_6_plain_compressed/1,
       fun rfc7234_section_5_5_6_already_compressed/1,
@@ -2203,17 +2203,17 @@ rfc7234_section_5_5_1_response_is_stale(Opts) ->
         end,
     {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"110">>))}.
 
-rfc7234_section_5_5_2_warning_revalidation_failed(Opts) ->
-    F = fun() ->
-           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-           http_cache:cache(Req,
-                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
-                            Opts),
-           {stale, {_, {_, RespHeaders, _}}} =
-               http_cache:get(Req, [{origin_unreachable, true} | Opts]),
-           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
-        end,
-    {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"111">>))}.
+%rfc7234_section_5_5_2_warning_revalidation_failed(Opts) ->
+%    F = fun() ->
+%           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+%           http_cache:cache(Req,
+%                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
+%                            Opts),
+%           {stale, {_, {_, RespHeaders, _}}} =
+%               http_cache:get(Req, [{origin_unreachable, true} | Opts]),
+%           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
+%        end,
+%    {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"111">>))}.
 
 rfc7234_section_5_5_4_warning_heuristics_expiration(Opts) ->
     F = fun() ->

@@ -16,7 +16,6 @@
              % data: an IOlist would have to be copied whereas (big) binaries are simply
              % reference-counted.
 
-%TODO: use {http_cache:response(), response_metadata()}
 -type response() ::
     {Status :: http_cache:status(),
      Headers :: http_cache:headers(),

@@ -229,6 +229,9 @@
 -define(is_no_transform(Headers),
         (is_map_key(<<"cache-control">>, Headers)
         andalso is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers)))).
+-define(has_strong_etag(ParsedRespHeaders),
+        (is_map_key(<<"etag">>, ParsedRespHeaders)
+         andalso element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong)).
 
 %%====================================================================
 %% API functions
@@ -496,7 +499,6 @@ cache(Request,
       Opts) ->
     refresh_stored_responses(Request, Response, normalize_opts(Opts)),
     UpdatedHeaders = update_headers(RevalidatedRespHeaders, RespHeaders),
-    %TODO: remove 1xx warnings
     {Status, UpdatedHeaders, RespBody};
 cache(Request, Response, _, Opts) ->
     cache(Request, Response, Opts).
@@ -556,10 +558,7 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
     when not is_map_key(<<"content-encoding">>, ParsedRespHeaders0)
          andalso not ?is_no_transform(ParsedRespHeaders0)
          andalso is_map_key({MainType, SubType}, ?DEFAULT_COMPRESS_MIME_TYPES)
-         andalso % do not compress response with strong etag
-                 % %TODO: use macro for this 3x guard?
-                 (not is_map_key(<<"etag">>, ParsedRespHeaders0)
-                  orelse element(1, map_get(<<"etag">>, ParsedRespHeaders0)) == weak) ->
+         andalso not ?has_strong_etag(ParsedRespHeaders0) ->
     ReqHeaders =
         delete_header(<<"accept-encoding">>, ReqHeaders0)
         ++ [{<<"accept-encoding">>, <<"gzip">>}],
@@ -581,7 +580,7 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
              StartTime,
              maps:put(compress_time, GzipDur, Measurements),
              maps:put(compressed_by_this_lib, true, Opts));
-do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
+do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
          ParsedReqHeaders,
          {Status, RespHeaders0, RespBody0},
          ParsedRespHeaders,
@@ -608,18 +607,18 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
           expires => Expires,
           grace => grace(Expires, Opts),
           ttl_set_by => TTLSetBy,
-          %TODO: keep only those which are really needed
-          parsed_headers => ParsedRespHeaders,
+          % For more efficiency, we store only headers we might need when getting responses
+          parsed_headers => maps:with([<<"cache-control">>, <<"content-encoding">>, <<"content-type">>, <<"date">>, <<"etag">>, <<"last-modified">>, <<"pragma">>], ParsedRespHeaders),
           alternate_keys => map_get(alternate_keys, Opts),
           compressed_by_this_lib => maps:get(compressed_by_this_lib, Opts, false)},
     {StoreDur, StoreRes} =
         timer:tc(Store, put, [RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata]),
     case StoreRes of
-        %TODO: logging
         ok ->
             ok;
-        {error, _Reason} ->
-            ok
+
+        {error, Reason} ->
+            logger:log(notice, #{what => store_response, in => ?MODULE, result => error, details => #{error_reason => Reason, request => #{method => Method, url => Url, headers => ReqHeaders0}, response => #{status => Status, headers => RespHeaders0}}, text => 'http_cache failed to store a response'})
     end,
     {TransformedResponse, TransformMeasurements} =
         transform_response(Request, ParsedReqHeaders, Response, RespMetadata, Opts),
@@ -745,8 +744,7 @@ varying_header_match(#{<<"accept-encoding">> := undefined},
                      #{parsed_headers :=
                            #{<<"content-encoding">> := [<<"gzip">>]} = ParsedRespHeaders},
                      #{auto_decompress := true})
-    when not is_map_key(<<"etag">>, ParsedRespHeaders)
-         orelse element(1, map_get(<<"etag">>, ParsedRespHeaders)) == weak ->
+    when not ?has_strong_etag(ParsedRespHeaders) ->
     not ?is_no_transform(ParsedRespHeaders);
 % we do not support multiple successive encodings
 varying_header_match(%TODO: use parsed request headers?
@@ -1209,9 +1207,7 @@ handle_auto_decompress(ParsedReqHeaders,
                        #{auto_decompress := true})
     % TODO: what if accept-encoding only supports identity?
     when not is_map_key(<<"accept-encoding">>, ParsedReqHeaders)
-         andalso % no decompressing of responses with strong validator
-                 (not is_map_key(<<"etag">>, ParsedRespHeaders)
-                  orelse element(1, map_get(<<"etag">>, ParsedRespHeaders)) == weak) ->
+         andalso not ?has_strong_etag(ParsedRespHeaders) ->
     {GunzipDur, DecompressedBody} = timer:tc(zlib, gunzip, [Body]),
     telemetry:execute(?TELEMETRY_DECOMPRESS_EVT, #{duration => GunzipDur}, #{alg => gzip}),
     ContentLengthBin = list_to_binary(integer_to_list(byte_size(DecompressedBody))),
