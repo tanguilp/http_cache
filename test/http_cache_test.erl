@@ -20,12 +20,13 @@ http_cache_test_() ->
       fun opt_allow_stale_if_error_resp_header/1, fun opt_auto_accept_encoding/1,
       fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
       fun opt_auto_decompress_multiple_content_encodings/1,
-      fun opt_auto_decompress_strong_etags/1, fun opt_bucket/1, fun opt_origin_unreachable/1,
-      fun opt_default_ttl/1, fun opt_ignore_query_params_order/1, fun opt_type/1,
-      fun opt_request_time/1, fun invalidate_url/1, fun invalidate_by_alternate_key/1,
-      fun invalidate_by_alternate_keys/1, fun rfc7234_section_3_method_cacheable/1,
-      fun rfc7234_section_3_nostore_absent/1, fun rfc7234_section_3_private_absent/1,
-      fun rfc7234_section_3_authz_header/1, fun rfc7234_section_3_resp_has_expires_ccdir/1,
+      fun opt_auto_decompress_strong_etags/1, fun opt_compression_threshold/1, fun opt_bucket/1,
+      fun opt_origin_unreachable/1, fun opt_default_ttl/1, fun opt_ignore_query_params_order/1,
+      fun opt_type/1, fun opt_request_time/1, fun invalidate_url/1,
+      fun invalidate_by_alternate_key/1, fun invalidate_by_alternate_keys/1,
+      fun rfc7234_section_3_method_cacheable/1, fun rfc7234_section_3_nostore_absent/1,
+      fun rfc7234_section_3_private_absent/1, fun rfc7234_section_3_authz_header/1,
+      fun rfc7234_section_3_resp_has_expires_ccdir/1,
       fun rfc7234_section_3_resp_has_maxage_ccdir/1,
       fun rfc7234_section_3_resp_has_smaxage_ccdir/1,
       fun rfc7234_section_3_resp_has_public_ccdir/1,
@@ -320,6 +321,19 @@ opt_auto_decompress_strong_etags(Opts) ->
      {spawn, ?_assertMatch(miss, F([{<<"accept-encoding">>, <<"br, identity">>}]))},
      {spawn, ?_assertMatch({fresh, _}, F([{<<"accept-encoding">>, <<"identity, gzip">>}]))},
      {spawn, ?_assertMatch({fresh, _}, F([{<<"accept-encoding">>, <<"gzip">>}]))}].
+
+opt_compression_threshold(Opts) ->
+    Body = <<"Some content">>,
+    GzippedBody = zlib:gzip(Body),
+    F = fun(Threshold) ->
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                            {200, [{<<"content-type">>, <<"text/plain">>}], Body},
+                            set_opt(compression_threshold,
+                                    Threshold,
+                                    set_opt(auto_compress, true, Opts)))
+        end,
+    [{spawn, ?_assertMatch({ok, {_, _, GzippedBody}}, F(0))},
+     {spawn, ?_assertMatch({ok, {_, _, Body}}, F(1000))}].
 
 opt_bucket(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -2502,6 +2516,7 @@ init() ->
     application:ensure_all_started(telemetry),
     [{default_ttl, 300},
      {default_grace, 300},
+     {compression_threshold, 0},
      {store, http_cache_store_process},
      {type, shared}].
 

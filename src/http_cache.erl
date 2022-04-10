@@ -107,6 +107,17 @@
 %%    Used by {@link get/2} and {@link cache/3}. Defaults to the atom `default'.
 %%  </li>
 %%  <li>
+%%    `compression_threshold': compression threshold in bytes. Compressing very tiny
+%%    responses can result in actually bigger response (in addition to the performance
+%%    hit of compression it). There's no additional cost when this library serves a
+%%    compressed file, but it has a cost on the client that has to decompress it.
+%%
+%%    See further discussion:
+%%    [https://webmasters.stackexchange.com/questions/31750/what-is-recommended-minimum-object-size-for-gzip-performance-benefits].
+%%
+%%    Used by {@link cache/3}. Defaults to the atom `1000'.
+%%  </li>
+%%  <li>
 %%    `origin_unreachable': indicates that the current cache using this library is unable to
 %%    reach the origin server. In this case, a stale response can be returned even if the
 %%    HTTP cache headers do not explicitely allow it.
@@ -161,6 +172,7 @@
     {auto_compress, boolean()} |
     {auto_decompress, boolean()} |
     {bucket, term()} |
+    {compression_threshold, non_neg_integer()} |
     {origin_unreachable, boolean()} |
     {default_ttl, non_neg_integer() | none} |
     {default_grace, non_neg_integer() | none} |
@@ -212,6 +224,7 @@
           auto_accept_encoding => false,
           auto_compress => false,
           auto_decompress => false,
+          compression_threshold => 1000,
           bucket => default,
           origin_unreachable => false,
           default_ttl => ?DEFAULT_TTL,
@@ -553,11 +566,12 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
          #{<<"content-type">> := {MainType, SubType, _}} = ParsedRespHeaders0,
          StartTime,
          Measurements,
-         #{auto_compress := true} = Opts)
-    when not is_map_key(<<"content-encoding">>, ParsedRespHeaders0)
-         andalso not ?is_no_transform(ParsedRespHeaders0)
-         andalso is_map_key({MainType, SubType}, ?DEFAULT_COMPRESS_MIME_TYPES)
-         andalso not ?has_strong_etag(ParsedRespHeaders0) ->
+         #{auto_compress := true, compression_threshold := CompressionThresold} = Opts)
+    when byte_size(RespBody) >= CompressionThresold,
+         not is_map_key(<<"content-encoding">>, ParsedRespHeaders0),
+         not ?is_no_transform(ParsedRespHeaders0),
+         is_map_key({MainType, SubType}, ?DEFAULT_COMPRESS_MIME_TYPES),
+         not ?has_strong_etag(ParsedRespHeaders0) ->
     ReqHeaders =
         delete_header(<<"accept-encoding">>, ReqHeaders0)
         ++ [{<<"accept-encoding">>, <<"gzip">>}],
