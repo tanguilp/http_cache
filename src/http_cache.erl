@@ -231,7 +231,7 @@
         andalso is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers)))).
 -define(has_strong_etag(ParsedRespHeaders),
         (is_map_key(<<"etag">>, ParsedRespHeaders)
-         andalso element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong)).
+        andalso element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong)).
 
 %%====================================================================
 %% API functions
@@ -288,25 +288,24 @@
              {must_revalidate, {response_ref(), response()}} |
              miss.
 get(Request, Opts) ->
-  try
-    do_get(Request, normalize_opts(Opts))
-  catch resp_body_no_longer_available ->
-    % The response was deleted from the backend between analysis time and fetch time.
-    % This might be because a more up to date response was uploaded into the cache.
-    % We retry 3 times before returning miss
-    case get(http_cache_get_attempt_count) of
-      undefined ->
-        put(http_cache_get_attempt_count, 1),
-        get(Request, Opts);
-
-      NbAttempts when NbAttempts =< 3 ->
-        put(http_cache_get_attempt_count, NbAttempts + 1),
-        get(Request, Opts);
-
-      _ ->
-        miss
-    end
-  end.
+    try
+        do_get(Request, normalize_opts(Opts))
+    catch
+        resp_body_no_longer_available ->
+            % The response was deleted from the backend between analysis time and fetch time.
+            % This might be because a more up to date response was uploaded into the cache.
+            % We retry 3 times before returning miss
+            case get(http_cache_get_attempt_count) of
+                undefined ->
+                    put(http_cache_get_attempt_count, 1),
+                    get(Request, Opts);
+                NbAttempts when NbAttempts =< 3 ->
+                    put(http_cache_get_attempt_count, NbAttempts + 1),
+                    get(Request, Opts);
+                _ ->
+                    miss
+            end
+    end.
 
 do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts) ->
     StartTime = now_monotonic_us(),
@@ -608,7 +607,15 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
           grace => grace(Expires, Opts),
           ttl_set_by => TTLSetBy,
           % For more efficiency, we store only headers we might need when getting responses
-          parsed_headers => maps:with([<<"cache-control">>, <<"content-encoding">>, <<"content-type">>, <<"date">>, <<"etag">>, <<"last-modified">>, <<"pragma">>], ParsedRespHeaders),
+          parsed_headers =>
+              maps:with([<<"cache-control">>,
+                         <<"content-encoding">>,
+                         <<"content-type">>,
+                         <<"date">>,
+                         <<"etag">>,
+                         <<"last-modified">>,
+                         <<"pragma">>],
+                        ParsedRespHeaders),
           alternate_keys => map_get(alternate_keys, Opts),
           compressed_by_this_lib => maps:get(compressed_by_this_lib, Opts, false)},
     {StoreDur, StoreRes} =
@@ -616,9 +623,19 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
     case StoreRes of
         ok ->
             ok;
-
         {error, Reason} ->
-            logger:log(notice, #{what => store_response, in => ?MODULE, result => error, details => #{error_reason => Reason, request => #{method => Method, url => Url, headers => ReqHeaders0}, response => #{status => Status, headers => RespHeaders0}}, text => 'http_cache failed to store a response'})
+            logger:log(notice,
+                       #{what => store_response,
+                         in => ?MODULE,
+                         result => error,
+                         details =>
+                             #{error_reason => Reason,
+                               request =>
+                                   #{method => Method,
+                                     url => Url,
+                                     headers => ReqHeaders0},
+                               response => #{status => Status, headers => RespHeaders0}},
+                         text => 'http_cache failed to store a response'})
     end,
     {TransformedResponse, TransformMeasurements} =
         transform_response(Request, ParsedReqHeaders, Response, RespMetadata, Opts),
@@ -742,22 +759,26 @@ varying_header_match(#{<<"accept-encoding">> := undefined},
                      <<"accept-encoding">>,
                      _RespHeaderValue,
                      #{parsed_headers :=
-                           #{<<"content-encoding">> := [<<"gzip">>]} = ParsedRespHeaders},
+                           #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders},
                      #{auto_decompress := true})
-    when not ?has_strong_etag(ParsedRespHeaders) ->
-    not ?is_no_transform(ParsedRespHeaders);
-% we do not support multiple successive encodings
-varying_header_match(%TODO: use parsed request headers?
-                     #{<<"accept-encoding">> := <<_/binary>> = AcceptEncoding},
+    when is_list(ContentEncodings) andalso not ?has_strong_etag(ParsedRespHeaders) ->
+    not ?is_no_transform(ParsedRespHeaders)
+    andalso lists:last(ContentEncodings) == <<"gzip">>;
+varying_header_match(#{<<"accept-encoding">> := <<_/binary>> = AcceptEncoding},
                      <<"accept-encoding">>,
                      _RespHeaderValue,
-                     #{parsed_headers := #{<<"content-encoding">> := [ContentEncoding]}},
-                     #{auto_accept_encoding := true}) ->
+                     #{parsed_headers :=
+                           #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders},
+                     #{auto_accept_encoding := true} = Opts)
+    when is_list(ContentEncodings) andalso not ?is_no_transform(ParsedRespHeaders) ->
+    ContentEncoding = lists:last(ContentEncodings),
     AcceptedEncodings =
         [Encoding
          || {Encoding, Priority} <- cow_http_hd:parse_accept_encoding(AcceptEncoding),
             Priority > 0],
-    lists:member(ContentEncoding, AcceptedEncodings);
+    lists:member(ContentEncoding, AcceptedEncodings)
+    orelse not ?has_strong_etag(ParsedRespHeaders)
+           andalso map_get(auto_decompress, Opts) == true;
 varying_header_match(NormReqHeaders,
                      RespHeaderName,
                      RespHeaderValue,
@@ -1200,29 +1221,50 @@ cache_type(#{type := Type}) ->
     Type.
 
 handle_auto_decompress(ParsedReqHeaders,
-                       {Status, RespHeaders0, Body},
+                       {Status, RespHeaders0, Body} = Response,
                        #{parsed_headers :=
-                             #{<<"content-encoding">> := [<<"gzip">>]} = ParsedRespHeaders,
+                             #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders,
                          compressed_by_this_lib := CompressedByThisLib},
                        #{auto_decompress := true})
-    % TODO: what if accept-encoding only supports identity?
-    when not is_map_key(<<"accept-encoding">>, ParsedReqHeaders)
-         andalso not ?has_strong_etag(ParsedRespHeaders) ->
-    {GunzipDur, DecompressedBody} = timer:tc(zlib, gunzip, [Body]),
-    telemetry:execute(?TELEMETRY_DECOMPRESS_EVT, #{duration => GunzipDur}, #{alg => gzip}),
-    ContentLengthBin = list_to_binary(integer_to_list(byte_size(DecompressedBody))),
-    RespHeaders1 = delete_header(<<"content-encoding">>, RespHeaders0),
-    RespHeaders2 = set_header_value(<<"content-content">>, ContentLengthBin, RespHeaders1),
-    RespHeaders3 =
-        case CompressedByThisLib of
-            true ->
-                RespHeaders2;
-            false ->
-                set_header_value(<<"warning">>,
-                                 <<"214 - \"Transformation Applied\"">>,
-                                 RespHeaders2)
-        end,
-    {Status, RespHeaders3, DecompressedBody};
+    when is_list(ContentEncodings) andalso not ?has_strong_etag(ParsedRespHeaders) ->
+    ContentEncoding = lists:last(ContentEncodings),
+    AcceptedEncodings =
+        [AcceptedEncoding
+         || {AcceptedEncoding, Priority}
+                <- maps:to_list(
+                       maps:get(<<"accept-encoding">>, ParsedReqHeaders, #{})),
+            Priority > 0],
+    case lists:member(ContentEncoding, AcceptedEncodings) of
+        true ->
+            Response;
+        false ->
+            {GunzipDur, DecompressedBody} = timer:tc(zlib, gunzip, [Body]),
+            telemetry:execute(?TELEMETRY_DECOMPRESS_EVT, #{duration => GunzipDur}, #{alg => gzip}),
+            ContentLengthBin = list_to_binary(integer_to_list(byte_size(DecompressedBody))),
+            RespHeaders1 = delete_header(<<"content-encoding">>, RespHeaders0),
+            RespHeaders2 =
+                case ContentEncodings of
+                    [_] ->
+                        RespHeaders1;
+                    SeveralContentEncodings ->
+                        AllEncodingsButLast =
+                            lists:reverse(tl(lists:reverse(SeveralContentEncodings))),
+                        ContentEncodingsBin =
+                            iolist_to_binary(lists:join(<<", ">>, AllEncodingsButLast)),
+                        set_header_value(<<"content-encoding">>, ContentEncodingsBin, RespHeaders1)
+                end,
+            RespHeaders3 = set_header_value(<<"content-length">>, ContentLengthBin, RespHeaders2),
+            RespHeaders4 =
+                case CompressedByThisLib of
+                    true ->
+                        RespHeaders3;
+                    false ->
+                        set_header_value(<<"warning">>,
+                                         <<"214 - \"Transformation Applied\"">>,
+                                         RespHeaders3)
+                end,
+            {Status, RespHeaders4, DecompressedBody}
+    end;
 handle_auto_decompress(_ParsedReqHeaders, Response, _RespMetadata, _Opts) ->
     Response.
 

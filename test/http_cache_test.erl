@@ -19,6 +19,7 @@ http_cache_test_() ->
      [fun opt_allow_stale_while_revalidate/1, fun opt_allow_stale_if_error_req_header/1,
       fun opt_allow_stale_if_error_resp_header/1, fun opt_auto_accept_encoding/1,
       fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
+      fun opt_auto_decompress_multiple_content_encodings/1,
       fun opt_auto_decompress_strong_etags/1, fun opt_bucket/1, fun opt_origin_unreachable/1,
       fun opt_default_ttl/1, fun opt_ignore_query_params_order/1, fun opt_type/1,
       fun opt_request_time/1, fun invalidate_url/1, fun invalidate_by_alternate_key/1,
@@ -266,15 +267,39 @@ opt_auto_decompress(Opts) ->
                             set_opt(auto_decompress, true, Opts)),
            {fresh, {_, {200, RespHeaders, RespBody}}} =
                http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
-                              set_opt(auto_decompress, true, Opts)),
+                              set_opt(auto_accept_encoding,
+                                      true,
+                                      set_opt(auto_decompress, true, Opts))),
            {proplists:get_value(<<"content-encoding">>, RespHeaders),
             proplists:get_value(<<"vary">>, RespHeaders),
             RespBody}
         end,
     [{spawn, ?_assertMatch({undefined, <<"accept-encoding">>, Body}, F([]))},
      {spawn,
+      ?_assertMatch({undefined, <<"accept-encoding">>, Body},
+                    F([{<<"accept-encoding">>, <<"br, identity">>}]))},
+     {spawn,
       ?_assertMatch({<<"gzip">>, <<"accept-encoding">>, GzippedBody},
                     F([{<<"accept-encoding">>, <<"gzip">>}]))}].
+
+opt_auto_decompress_multiple_content_encodings(Opts) ->
+    Body = <<"Some content">>,
+    GzippedBody = zlib:gzip(Body),
+    F = fun() ->
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                            {200,
+                             [{<<"content-encoding">>, <<"identity, gzip">>},
+                              {<<"vary">>, <<"accept-encoding">>}],
+                             GzippedBody},
+                            set_opt(auto_decompress, true, Opts)),
+           {fresh, {_, {200, RespHeaders, RespBody}}} =
+               http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>},
+                              set_opt(auto_accept_encoding,
+                                      true,
+                                      set_opt(auto_decompress, true, Opts))),
+           {proplists:get_value(<<"content-encoding">>, RespHeaders), RespBody}
+        end,
+    {spawn, ?_assertMatch({<<"identity">>, Body}, F())}.
 
 opt_auto_decompress_strong_etags(Opts) ->
     Body = <<"Some content">>,
@@ -288,9 +313,12 @@ opt_auto_decompress_strong_etags(Opts) ->
                              GzippedBody},
                             set_opt(auto_decompress, true, Opts)),
            http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
-                          set_opt(auto_decompress, true, Opts))
+                          set_opt(auto_accept_encoding, true, set_opt(auto_decompress, true, Opts)))
         end,
     [{spawn, ?_assertMatch(miss, F([]))},
+     {spawn, ?_assertMatch(miss, F([{<<"accept-encoding">>, <<"identity">>}]))},
+     {spawn, ?_assertMatch(miss, F([{<<"accept-encoding">>, <<"br, identity">>}]))},
+     {spawn, ?_assertMatch({fresh, _}, F([{<<"accept-encoding">>, <<"identity, gzip">>}]))},
      {spawn, ?_assertMatch({fresh, _}, F([{<<"accept-encoding">>, <<"gzip">>}]))}].
 
 opt_bucket(Opts) ->
@@ -1974,13 +2002,23 @@ rfc7234_section_5_2_2_4_ccdir_no_transform_auto_decompress(Opts) ->
           {<<"vary">>, <<"accept-encoding">>}],
          zlib:gzip(<<"Some compressed content">>)},
     Store = fun() -> http_cache:cache(Req, Resp, set_opt(auto_decompress, true, Opts)) end,
-    {spawn,
-     ?_assertMatch(miss,
-                   begin
-                       Store(),
-                       http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>},
-                                      set_opt(auto_decompress, true, Opts))
-                   end)}.
+    [{spawn,
+      ?_assertMatch(miss,
+                    begin
+                        Store(),
+                        http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>},
+                                       set_opt(auto_decompress, true, Opts))
+                    end)},
+     {spawn,
+      ?_assertMatch(miss,
+                    begin
+                        Store(),
+                        http_cache:get({<<"GET">>,
+                                        ?TEST_URL,
+                                        [{<<"accept-encoding">>, <<"identity">>}],
+                                        <<"">>},
+                                       set_opt(auto_decompress, true, Opts))
+                    end)}].
 
 rfc7234_section_5_2_2_4_ccdir_no_transform_range(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
