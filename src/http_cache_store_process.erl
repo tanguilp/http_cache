@@ -3,7 +3,7 @@
 -behaviour(http_cache_store).
 
 -export([list_candidates/1, get_response/1, put/5, invalidate_url/1,
-         invalidate_by_alternate_key/1, notify_resp_used/2]).
+         invalidate_by_alternate_key/1, notify_resp_used/2, save_in_file/0]).
 
 list_candidates(ReqKey) ->
     Now = unix_now(),
@@ -22,9 +22,21 @@ get_response(RespRef) ->
             undefined
     end.
 
-put(ReqKey, UrlDigest, VaryHeaders, Response, RespMetadata) ->
+put(ReqKey, UrlDigest, VaryHeaders, {Status, RespHeaders, RespBody0}, RespMetadata) ->
+    RespBody1 =
+        case get({?MODULE, save_in_file}) of
+            true ->
+                FileName =
+                    "/tmp/http_cache_test_"
+                    ++ integer_to_list(erlang:unique_integer([positive]))
+                    ++ ".txt",
+                ok = file:write_file(FileName, <<"Some content">>),
+                {file, FileName};
+            undefined ->
+                RespBody0
+        end,
     RespRef = {ReqKey, VaryHeaders},
-    put(RespRef, {Response, UrlDigest, RespMetadata, unix_now()}),
+    put(RespRef, {{Status, RespHeaders, RespBody1}, UrlDigest, RespMetadata, unix_now()}),
     ok.
 
 invalidate_url(SearchedUrlDigest) ->
@@ -52,6 +64,9 @@ notify_resp_used(RespRef, Time) ->
         undefined ->
             ok
     end.
+
+save_in_file() ->
+    put({?MODULE, save_in_file}, true).
 
 unix_now() ->
     os:system_time(second).

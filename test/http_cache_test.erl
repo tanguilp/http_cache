@@ -24,17 +24,15 @@ http_cache_test_() ->
       fun opt_origin_unreachable/1, fun opt_default_ttl/1, fun opt_ignore_query_params_order/1,
       fun opt_type/1, fun opt_request_time/1, fun invalidate_url/1,
       fun invalidate_by_alternate_key/1, fun invalidate_by_alternate_keys/1,
-      fun rfc7234_section_3_method_cacheable/1, fun rfc7234_section_3_nostore_absent/1,
-      fun rfc7234_section_3_private_absent/1, fun rfc7234_section_3_authz_header/1,
-      fun rfc7234_section_3_resp_has_expires_ccdir/1,
+      fun response_stored_in_file_by_backend/1, fun rfc7234_section_3_method_cacheable/1,
+      fun rfc7234_section_3_nostore_absent/1, fun rfc7234_section_3_private_absent/1,
+      fun rfc7234_section_3_authz_header/1, fun rfc7234_section_3_resp_has_expires_ccdir/1,
       fun rfc7234_section_3_resp_has_maxage_ccdir/1,
       fun rfc7234_section_3_resp_has_smaxage_ccdir/1,
       fun rfc7234_section_3_resp_has_public_ccdir/1,
       fun rfc7234_section_3_1_range_response_not_cached/1,
       fun rfc7234_section_3_2_authorization_header_caching/1,
-      %fun rfc7234_section_4_head_of_get/1,
-      fun rfc7234_section_4_req_nocache_ccdir/1,
-      fun rfc7234_section_4_resp_nocache_ccdir/1,
+      fun rfc7234_section_4_req_nocache_ccdir/1, fun rfc7234_section_4_resp_nocache_ccdir/1,
       fun rfc7234_section_4_age_resp_header_generated/1,
       fun rfc7234_section_4_most_recent_resp/1, fun rfc7234_section_4_1_vary_header/1,
       fun rfc7234_section_4_2_stale_on_expired/1, fun rfc7234_section_4_2_1_smaxage_shared/1,
@@ -494,6 +492,21 @@ invalidate_by_alternate_keys(Opts) ->
            http_cache:get(Req, Opts)
         end,
     {spawn, ?_assertEqual(miss, F())}.
+
+response_stored_in_file_by_backend(Opts) ->
+    F = fun(ReqHeaders) ->
+           http_cache_store_process:save_in_file(),
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                            {200, [], <<"Some content">>},
+                            Opts),
+           http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>}, Opts)
+        end,
+    [{spawn, ?_assertMatch({fresh, {_, {_, _, {sendfile, 0, all, _}}}}, F([]))},
+     {spawn,
+      ?_assertMatch({fresh, {_, {_, _, {sendfile, 0, 4, _}}}},
+                    F([{<<"range">>, <<"bytes=0-3">>}]))},
+     {spawn,
+      ?_assertMatch({fresh, {_, {206, _, _}}}, F([{<<"range">>, <<"bytes=0-3, 5-">>}]))}].
 
 rfc7234_section_3_method_cacheable(Opts) ->
     [?_assertMatch({ok, _},

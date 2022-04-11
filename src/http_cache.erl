@@ -240,11 +240,11 @@
 -define(TELEMETRY_COMPRESS_EVT, [http_cache, compress_operation]).
 -define(TELEMETRY_DECOMPRESS_EVT, [http_cache, decompress_operation]).
 -define(is_no_transform(Headers),
-        (is_map_key(<<"cache-control">>, Headers)
-        andalso is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers)))).
+        is_map_key(<<"cache-control">>, Headers)
+        andalso is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers))).
 -define(has_strong_etag(ParsedRespHeaders),
-        (is_map_key(<<"etag">>, ParsedRespHeaders)
-        andalso element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong)).
+        is_map_key(<<"etag">>, ParsedRespHeaders)
+        andalso element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong).
 
 %%====================================================================
 %% API functions
