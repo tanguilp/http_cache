@@ -240,11 +240,11 @@
 -define(TELEMETRY_COMPRESS_EVT, [http_cache, compress_operation]).
 -define(TELEMETRY_DECOMPRESS_EVT, [http_cache, decompress_operation]).
 -define(is_no_transform(Headers),
-        is_map_key(<<"cache-control">>, Headers)
-        andalso is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers))).
+        (is_map_key(<<"cache-control">>, Headers)
+        andalso is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers)))).
 -define(has_strong_etag(ParsedRespHeaders),
-        is_map_key(<<"etag">>, ParsedRespHeaders)
-        andalso element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong).
+        (is_map_key(<<"etag">>, ParsedRespHeaders)
+        andalso element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong)).
 
 %%====================================================================
 %% API functions
@@ -983,6 +983,8 @@ set_warning_transformation_applied(RespHeaders,
 set_warning_transformation_applied(RespHeaders, _RespMetadata, _RespBody) ->
     RespHeaders.
 
+handle_file_body({_Status, _RespHeaders, {sendfile, _, _, _}} = Response) ->
+    Response;
 handle_file_body({Status, RespHeaders, {file, FilePath}}) ->
     {Status, RespHeaders, {sendfile, 0, all, FilePath}};
 handle_file_body(Response) ->
@@ -1343,8 +1345,7 @@ handle_range_request({<<"GET">>, _, _, _},
     BodySize = resp_body_byte_size(Response),
     NormByteRangeSpec = normalize_range_spec(ByteRangeSpec, BodySize),
     if length(NormByteRangeSpec) < MaxRanges ->
-           ChunksWithRange = get_range_chunks(NormByteRangeSpec, Response),
-           build_range_response(ChunksWithRange, BodySize, Response, RespMetadata);
+           build_range_response(NormByteRangeSpec, BodySize, Response, RespMetadata);
        true ->
            range_not_satisfiable_resp(BodySize)
     end;
@@ -1387,29 +1388,11 @@ normalize_range_spec([OffsetFromEnd | Rest], BodySize, Acc) ->
                          BodySize,
                          [{BodySize - abs(OffsetFromEnd), abs(OffsetFromEnd)} | Acc]).
 
-get_range_chunks(NormByteRangeSpec, {_, _, {file, Filename}}) ->
-    case file:open(Filename, [read, raw, binary]) of
-        {ok, File} ->
-            case file:pread(File, NormByteRangeSpec) of
-                {ok, Chunks} ->
-                    file:close(File),
-                    lists:zip(NormByteRangeSpec, Chunks);
-                {error, _} ->
-                    file:close(File),
-                    throw(resp_body_no_longer_available)
-            end;
-        {error, _} ->
-            throw(resp_body_no_longer_available)
-    end;
-get_range_chunks(NormByteRangeSpec, {_, _, Body}) ->
-    [{Range, binary:part(Body, StartOffset, Length)}
-     || {StartOffset, Length} = Range <- NormByteRangeSpec].
-
 build_range_response([], BodySize, _Response, _RespMetadata) ->
     range_not_satisfiable_resp(BodySize);
-build_range_response([{{StartOffset, Length}, Chunk}],
+build_range_response([{StartOffset, Length}],
                      BodySize,
-                     {_Status, RespHeaders0, _Body},
+                     {_Status, RespHeaders0, BodyOrFile},
                      _RespMetadata) ->
     RespHeaders1 = delete_header(<<"content-length">>, RespHeaders0),
     RespHeaders2 =
@@ -1420,11 +1403,18 @@ build_range_response([{{StartOffset, Length}, Chunk}],
         set_header_value(<<"content-length">>,
                          list_to_binary(integer_to_list(Length)),
                          RespHeaders2),
-    {206, RespHeaders3, Chunk};
-build_range_response([{{FirstStartOffset, FirstLength}, FirstChunk} | OtherChunks],
+    case BodyOrFile of
+        <<_/binary>> = BinBody ->
+            {206, RespHeaders3, binary:part(BinBody, StartOffset, Length)};
+        {file, FilePath} ->
+            {206, RespHeaders3, {sendfile, StartOffset, Length, FilePath}}
+    end;
+build_range_response(NormByteRangeSpec,
                      BodySize,
-                     {_Status, RespHeaders, _Body},
+                     {_Status, RespHeaders, _Body} = Response,
                      RespMetadata) ->
+    [{{FirstStartOffset, FirstLength}, FirstChunk} | OtherChunks] =
+        get_range_chunks(NormByteRangeSpec, Response),
     PartBaseHeaders =
         case RespMetadata of
             #{parsed_headers := #{<<"content-type">> := ContentType}} ->
@@ -1450,6 +1440,24 @@ build_range_response([{{FirstStartOffset, FirstLength}, FirstChunk} | OtherChunk
          | delete_header(<<"content-type">>, RespHeaders)],
     Body = [FirstPart, OtherParts, cow_multipart:close(Boundary)],
     {206, RespHeadersMultipart, Body}.
+
+get_range_chunks(NormByteRangeSpec, {_, _, {file, Filename}}) ->
+    case file:open(Filename, [read, raw, binary]) of
+        {ok, File} ->
+            case file:pread(File, NormByteRangeSpec) of
+                {ok, Chunks} ->
+                    file:close(File),
+                    lists:zip(NormByteRangeSpec, Chunks);
+                {error, _} ->
+                    file:close(File),
+                    throw(resp_body_no_longer_available)
+            end;
+        {error, _} ->
+            throw(resp_body_no_longer_available)
+    end;
+get_range_chunks(NormByteRangeSpec, {_, _, Body}) ->
+    [{Range, binary:part(Body, StartOffset, Length)}
+     || {StartOffset, Length} = Range <- NormByteRangeSpec].
 
 content_range(StartOffset, Length, BodySize) ->
     BodySizeBin = list_to_binary(integer_to_list(BodySize)),
