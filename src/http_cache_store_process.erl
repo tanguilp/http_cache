@@ -30,7 +30,7 @@ put(ReqKey, UrlDigest, VaryHeaders, {Status, RespHeaders, RespBody0}, RespMetada
                     "/tmp/http_cache_test_"
                     ++ integer_to_list(erlang:unique_integer([positive]))
                     ++ ".txt",
-                ok = file:write_file(FileName, <<"Some content">>),
+                ok = file:write_file(FileName, RespBody0),
                 {file, FileName};
             undefined ->
                 RespBody0

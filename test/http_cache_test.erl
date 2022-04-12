@@ -20,13 +20,14 @@ http_cache_test_() ->
       fun opt_allow_stale_if_error_resp_header/1, fun opt_auto_accept_encoding/1,
       fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
       fun opt_auto_decompress_multiple_content_encodings/1,
-      fun opt_auto_decompress_strong_etags/1, fun opt_compression_threshold/1, fun opt_bucket/1,
-      fun opt_origin_unreachable/1, fun opt_default_ttl/1, fun opt_ignore_query_params_order/1,
-      fun opt_type/1, fun opt_request_time/1, fun invalidate_url/1,
-      fun invalidate_by_alternate_key/1, fun invalidate_by_alternate_keys/1,
-      fun response_stored_in_file_by_backend/1, fun rfc7234_section_3_method_cacheable/1,
-      fun rfc7234_section_3_nostore_absent/1, fun rfc7234_section_3_private_absent/1,
-      fun rfc7234_section_3_authz_header/1, fun rfc7234_section_3_resp_has_expires_ccdir/1,
+      fun opt_auto_decompress_when_body_is_a_file/1, fun opt_auto_decompress_strong_etags/1,
+      fun opt_compression_threshold/1, fun opt_bucket/1, fun opt_origin_unreachable/1,
+      fun opt_default_ttl/1, fun opt_ignore_query_params_order/1, fun opt_type/1,
+      fun opt_request_time/1, fun invalidate_url/1, fun invalidate_by_alternate_key/1,
+      fun invalidate_by_alternate_keys/1, fun response_stored_in_file_by_backend/1,
+      fun rfc7234_section_3_method_cacheable/1, fun rfc7234_section_3_nostore_absent/1,
+      fun rfc7234_section_3_private_absent/1, fun rfc7234_section_3_authz_header/1,
+      fun rfc7234_section_3_resp_has_expires_ccdir/1,
       fun rfc7234_section_3_resp_has_maxage_ccdir/1,
       fun rfc7234_section_3_resp_has_smaxage_ccdir/1,
       fun rfc7234_section_3_resp_has_public_ccdir/1,
@@ -299,6 +300,22 @@ opt_auto_decompress_multiple_content_encodings(Opts) ->
            {proplists:get_value(<<"content-encoding">>, RespHeaders), RespBody}
         end,
     {spawn, ?_assertMatch({<<"identity">>, Body}, F())}.
+
+opt_auto_decompress_when_body_is_a_file(Opts) ->
+    Body = <<"Some content">>,
+    GzippedBody = zlib:gzip(Body),
+    F = fun() ->
+           http_cache_store_process:save_in_file(),
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                            {200,
+                             [{<<"content-encoding">>, <<"gzip">>},
+                              {<<"vary">>, <<"accept-encoding">>}],
+                             GzippedBody},
+                            set_opt(auto_decompress, true, Opts)),
+           http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>},
+                          set_opt(auto_accept_encoding, true, set_opt(auto_decompress, true, Opts)))
+        end,
+    {spawn, ?_assertMatch({fresh, {_, {_, _, <<"Some content">>}}}, F())}.
 
 opt_auto_decompress_strong_etags(Opts) ->
     Body = <<"Some content">>,

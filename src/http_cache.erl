@@ -1237,7 +1237,7 @@ cache_type(#{type := Type}) ->
     Type.
 
 handle_auto_decompress(ParsedReqHeaders,
-                       {Status, RespHeaders0, Body} = Response,
+                       {Status, RespHeaders0, BodyOrFile} = Response,
                        #{parsed_headers :=
                              #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders,
                          compressed_by_this_lib := CompressedByThisLib},
@@ -1254,7 +1254,8 @@ handle_auto_decompress(ParsedReqHeaders,
         true ->
             Response;
         false ->
-            {GunzipDur, DecompressedBody} = timer:tc(zlib, gunzip, [Body]),
+            CompressedBody = get_body_content(BodyOrFile),
+            {GunzipDur, DecompressedBody} = timer:tc(zlib, gunzip, [CompressedBody]),
             telemetry:execute(?TELEMETRY_DECOMPRESS_EVT, #{duration => GunzipDur}, #{alg => gzip}),
             ContentLengthBin = list_to_binary(integer_to_list(byte_size(DecompressedBody))),
             RespHeaders1 = delete_header(<<"content-encoding">>, RespHeaders0),
@@ -1637,17 +1638,8 @@ update_candidates([{RespRef, _, _, _, #{alternate_keys := AltKeys}} | Rest],
                   Type,
                   #{store := Store} = Opts) ->
     try
-        {Status, StoredRespHeaders, FileOrBody, _} = Store:get_response(RespRef),
-
-        RespBody =
-            case FileOrBody of
-                {file, Filename} ->
-                    {ok, Content} = file:read_file(Filename),
-                    Content;
-                Other ->
-                    Other
-            end,
-
+        {Status, StoredRespHeaders, BodyOrFile, _} = Store:get_response(RespRef),
+        RespBody = get_body_content(BodyOrFile),
         UpdatedRespHeaders =
             case Type of
                 update_headers ->
@@ -1782,6 +1774,12 @@ parsed_content_type_to_string({MainType, SubType, Params}) ->
     JoinedParams =
         iolist_to_binary([<<"; ", Name/binary, "=", Value/binary>> || {Name, Value} <- Params]),
     <<MainType/binary, "/", SubType/binary, JoinedParams/binary>>.
+
+get_body_content({file, FilePath}) ->
+    {ok, Content} = file:read_file(FilePath),
+    Content;
+get_body_content(<<_/binary>> = BinBody) ->
+    BinBody.
 
 log_invalidation_result({ok, NbInvalidation}, Type, InvalidationDur)
     when is_integer(NbInvalidation) ->
