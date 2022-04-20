@@ -511,7 +511,7 @@ cache(Request,
       Opts) ->
     refresh_stored_responses(Request, Response, normalize_opts(Opts)),
     UpdatedHeaders = update_headers(RevalidatedRespHeaders, RespHeaders),
-    {Status, UpdatedHeaders, RespBody};
+    {ok, {Status, UpdatedHeaders, RespBody}};
 cache(Request, Response, _, Opts) ->
     cache(Request, Response, Opts).
 
@@ -541,7 +541,11 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
             not_cacheable;
         false ->
             ParsedReqHeaders =
-                parse_headers(ReqHeaders, [<<"authorization">>, <<"cache-control">>, <<"pragma">>]),
+                parse_headers(ReqHeaders,
+                              [<<"authorization">>,
+                               <<"cache-control">>,
+                               <<"pragma">>,
+                               <<"range">>]),
 
             case is_cacheable(Method, ParsedReqHeaders, Status, ParsedRespHeaders, Opts) of
                 true ->

@@ -25,6 +25,8 @@ http_cache_test_() ->
       fun opt_default_ttl/1, fun opt_ignore_query_params_order/1, fun opt_type/1,
       fun opt_request_time/1, fun invalidate_url/1, fun invalidate_by_alternate_key/1,
       fun invalidate_by_alternate_keys/1, fun response_stored_in_file_by_backend/1,
+      fun cache_3_transforms_response_compression/1, fun cache_3_transforms_response_range/1,
+      fun cache_4_transforms_response_compression/1, fun cache_4_transforms_response_range/1,
       fun rfc7234_section_3_method_cacheable/1, fun rfc7234_section_3_nostore_absent/1,
       fun rfc7234_section_3_private_absent/1, fun rfc7234_section_3_authz_header/1,
       fun rfc7234_section_3_resp_has_expires_ccdir/1,
@@ -524,6 +526,61 @@ response_stored_in_file_by_backend(Opts) ->
                     F([{<<"range">>, <<"bytes=0-3">>}]))},
      {spawn,
       ?_assertMatch({fresh, {_, {206, _, _}}}, F([{<<"range">>, <<"bytes=0-3, 5-">>}]))}].
+
+cache_3_transforms_response_compression(Opts) ->
+    Body = <<"Some content">>,
+    GzippedBody = zlib:gzip(Body),
+    {spawn,
+     ?_assertMatch({ok, {_, _, GzippedBody}},
+                   http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                                    {200, [{<<"content-type">>, <<"text/plain">>}], Body},
+                                    set_opt(auto_compress, true, Opts)))}.
+
+cache_3_transforms_response_range(Opts) ->
+    {spawn,
+     ?_assertMatch({ok, {206, _, <<"Some">>}},
+                   http_cache:cache({<<"GET">>,
+                                     ?TEST_URL,
+                                     [{<<"range">>, <<"bytes=0-3">>}],
+                                     <<"">>},
+                                    {200, [], <<"Some content">>},
+                                    Opts))}.
+
+cache_4_transforms_response_compression(Opts) ->
+    Body = <<"Some content">>,
+    GzippedBody = zlib:gzip(Body),
+    {spawn,
+     ?_assertMatch({ok, {200, _, GzippedBody}},
+                   begin
+                       {ok, RespToRevalidate} =
+                           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                                            {200, [{<<"content-type">>, <<"text/plain">>}], Body},
+                                            set_opt(auto_compress, true, Opts)),
+                       http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                                        {304, [{<<"content-type">>, <<"text/plain">>}], <<>>},
+                                        RespToRevalidate,
+                                        set_opt(auto_compress, true, Opts))
+                   end)}.
+
+cache_4_transforms_response_range(Opts) ->
+    {spawn,
+     ?_assertMatch({ok, {206, _, <<"Some">>}},
+                   begin
+                       {ok, RespToRevalidate} =
+                           http_cache:cache({<<"GET">>,
+                                             ?TEST_URL,
+                                             [{<<"range">>, <<"bytes=0-3">>}],
+                                             <<"">>},
+                                            {200, [], <<"Some content">>},
+                                            Opts),
+                       http_cache:cache({<<"GET">>,
+                                         ?TEST_URL,
+                                         [{<<"range">>, <<"bytes=0-3">>}],
+                                         <<"">>},
+                                        {304, [], <<>>},
+                                        RespToRevalidate,
+                                        Opts)
+                   end)}.
 
 rfc7234_section_3_method_cacheable(Opts) ->
     [?_assertMatch({ok, _},
