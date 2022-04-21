@@ -106,7 +106,8 @@ http_cache_test_() ->
       fun rfc7233_multiple_byte_range/1, fun rfc7233_unknown_range_type/1,
       fun rfc7233_no_satisfiable_range/1,
       fun rfc7233_no_satisfiable_range_content_range_header/1,
-      fun rfc7233_range_ignored_not_get/1, fun rfc7233_error_on_too_many_ranges/1]}.
+      fun rfc7233_range_ignored_not_get/1, fun rfc7233_error_on_too_many_ranges/1,
+      fun rfc7233_range_and_accept_encoding/1]}.
 
 opt_allow_stale_while_revalidate(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -2626,6 +2627,23 @@ rfc7233_error_on_too_many_ranges(Opts) ->
                           OptsRestrict)
         end,
     {spawn, ?_assertMatch({fresh, {_, {416, _, _}}}, begin F() end)}.
+
+rfc7233_range_and_accept_encoding(Opts) ->
+    {spawn,
+     ?_assertNotMatch({fresh, {_, {206, _, <<"content">>}}},
+                      begin
+                          http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                                           {200,
+                                            [{<<"content-encoding">>, <<"gzip">>}],
+                                            zlib:gzip(<<"Some content">>)},
+                                           Opts),
+                          http_cache:get({<<"GET">>,
+                                          ?TEST_URL,
+                                          [{<<"range">>, <<"bytes=5-11">>},
+                                           {<<"accept-encoding">>, <<"gzip">>}],
+                                          <<"">>},
+                                         set_opt(auto_decompress, true, Opts))
+                      end)}.
 
 set_opt(OptName, OptValue, Opts) ->
     [{OptName, OptValue} | proplists:delete(OptName, Opts)].
