@@ -1,3 +1,14 @@
+%%%-----------------------------------------------------------------------------
+%%% @doc An in-process implementation of {@link http_cache_store}
+%%%
+%%% This implementation is used in this library's test and can be used in your own tests.
+%%% It stores data in the current process, and thus provides isolation. It cannot, of course, be
+%%% used in real-life because data is discarded as soon as the process dies.
+%%%
+%%% The {@link save_in_file/0} function can be used to simulate a store that saves responses
+%%% on the disk. It saves the responses to files in `tmp' and therefore cannot be used on
+%%% non-UNIX systems.
+
 -module(http_cache_store_process).
 
 -behaviour(http_cache_store).
@@ -65,6 +76,11 @@ notify_resp_used(RespRef, Time) ->
             ok
     end.
 
+%%------------------------------------------------------------------------------
+%% @doc Save store response in a file
+%%
+%% When called before saving, it instructs this implementation to store the response in a file
+%% in `/tmp'. Not thaat it works only on UNIX systems.
 save_in_file() ->
     put({?MODULE, save_in_file}, true).
 

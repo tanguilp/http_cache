@@ -1,36 +1,133 @@
+%%%-----------------------------------------------------------------------------
+%%% @doc An HTTP caching library
+%%%
+%%% `http_cache' is a stateless Erlang HTTP caching library that implements the various
+%%% HTTP RFCs related to caching.
+%%%
+%%% == Modules ==
+%%%
+%%% {@link http_cache} exposes functions to cache backend responses, get cached responses
+%%% whenever they can be served, and invalidate previously stored responses.
+%%%
+%%% {@link http_cache_store} is the behaviour to be implemented by stores.
+%%%
+%%% {@link http_cache_store_process} is an example store that stores cached responses in
+%%% the current process and is mainly used for testing purpose.
+%%%
+%%% == Telemetry events ==
+%%%
+%%% All time measurements are in microseconds.
+%%%
+%%% The following events are emitted by `http_cache':
+%%% <ul>
+%%%   <li>
+%%%     `[http_cache, lookup]' when {@link http_cache:get/2} is called.
+%%%
+%%%     Measurements:
+%%%     <ul>
+%%%       <li>`total_time': the total time of the lookup</li>
+%%%       <li>`store_lookup_time': time taken to query the store for suitable responses</li>
+%%%       <li>`response_selection_time': time to select the best response among suitable
+%%%       responses. A high value can indicate the presence of too many variants</li>
+%%%       <li>`candidate_count': the number of candidate responses that are returned by the
+%%%       store. A high value can indicate the presence of too many variants</li>
+%%%       <li>`decompress_time': time spend decompressing the response</li>
+%%%       <li>`range_time': time spend constructing a range response</li>
+%%%     </ul>
+%%%
+%%%     Metadata:
+%%%     <ul>
+%%%       <li>`freshness': one of `fresh', `stale', `must_revalidate' or `miss'</li>
+%%%     </ul>
+%%%   </li>
+%%%   <li>
+%%%     `[http_cache, cache]' when {@link http_cache:cache/3} or {@link http_cache:cache/4}
+%%%     is called.
+%%%
+%%%     Measurements:
+%%%     <ul>
+%%%       <li>`total_time': the total time of the caching operation</li>
+%%%       <li>`store_save_time': time taken to save the response into the store</li>
+%%%       <li>`compress_time': time spend compressing the response. This happens when the
+%%%       `auto_compress' option is used</li>
+%%%       <li>`decompress_time': time spend decompressing the response. This happens when the
+%%%       `auto_compress' option is used but the client does not support compression and
+%%%       the result, stored compressed, has to be returned uncompressed</li>
+%%%       <li>`range_time': time spend constructing a range response</li>
+%%%     </ul>
+%%%
+%%%     Metadata:
+%%%     <ul>
+%%%       <li>`cacheable': `true' if the response was cacheable (and cached), `false' otherwise</li>
+%%%     </ul>
+%%%   </li>
+%%%   <li>
+%%%     `[http_cache, invalidation]' when {@link http_cache:invalidate_url/2} or
+%%%     {@link http_cache:invalidate_by_alternate_key/2} is called.
+%%%
+%%%     Measurements:
+%%%     <ul>
+%%%       <li>`duration': the time it took to invalidate entries</li>
+%%%       <li>
+%%%         `count': the number of entries invalidated if the store supports returning this value
+%%%       </li>
+%%%     </ul>
+%%%
+%%%     Metadata:
+%%%     <ul>
+%%%       <li>`type': `url' or `alternate_key'</li>
+%%%     </ul>
+%%%   </li>
+%%%   <li>
+%%%     `[http_cache, compress_operation]' whenever a compress operation is performed on an
+%%%     HTTP response.
+%%%
+%%%     Measurements: none
+%%%
+%%%     Metadata:
+%%%     <ul>
+%%%       <li>`alg': `gzip' (which is the only supported algorithm at the moment)</li>
+%%%     </ul>
+%%%   </li>
+%%%   <li>
+%%%     `[http_cache, decompress_operation]' whenever a decompress operation is performed on an
+%%%     HTTP response.
+%%%
+%%%     Measurements: none
+%%%
+%%%     Metadata:
+%%%     <ul>
+%%%       <li>`alg': `gzip' (which is the only supported algorithm at the moment)</li>
+%%%     </ul>
+%%%   </li>
+%%% </ul>
+%%% @end
+%%%-----------------------------------------------------------------------------
 -module(http_cache).
 
 %% API exports
 -export([get/2, notify_use/2, cache/3, cache/4, invalidate_url/2,
          invalidate_by_alternate_key/2]).
 
--export_type([alternate_key/0, headers/0, request_key/0, response/0, status/0,
-              timestamp/0, vary_headers/0]).
+-export_type([alternate_key/0, headers/0, response/0, status/0, timestamp/0]).
 
 -include_lib("cowlib/include/cow_inline.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -type method() :: binary().
+%% An HTTP method, for example "PATCH"
 -type url() :: binary().
 -type headers() :: [{binary(), binary()}].
-%% A list of headers. A header can be present multiple times.
+%% A list of headers. Some headers can appear multiple times.
 -type body() :: iodata().
 -type status() :: pos_integer().
 -type request() :: {method(), url(), headers(), body()}.
--type response_ref() :: http_cache_store:response_ref().
-%% Opaque backend's reference to a response, returned by
-%% {@link get/2} and used as a parameter by {@link notify_use/2}.
--type response() :: {status(), headers(), body() | sendfile() | undefined}.
-%% HTTP response. The atom `undefined' is returned as a body in case response has
-%% to be revalidated (and therefore the body cannot and shouldn't be used).
+-type response() :: {status(), headers(), body() | sendfile()}.
 -type sendfile() ::
     {sendfile,
      Offset :: non_neg_integer(),
      Length :: non_neg_integer() | all,
      Path :: binary()}.
--type vary_headers() :: #{binary() := binary() | undefined}.
-%% Merged headers on which the response varies. Used by backends.
--type request_key() :: term().
 -type alternate_key() :: term().
 %% Alternate key attached to a stored response. Used to invalidate by
 %% alternate key instead of URL (e.g. to invalidate all the images if
@@ -44,7 +141,7 @@
 %%  <li>
 %%    `alternate_keys': alternate keys associated with the stored request. Requests
 %%    can then be invalidated by alternate key with {@link invalidate_by_alternate_key/2}.
-%%    Use by {@link cache/3}.
+%%    Use by {@link cache/3} and {@link cache/4}.
 %%  </li>
 %%  <li>
 %%    `allow_stale_while_revalidate': allows returning valid stale response while revalidating.
@@ -81,13 +178,13 @@
 %%    Does not compress responses with strong etags (see
 %%    [https://bz.apache.org/bugzilla/show_bug.cgi?id=63932]).
 %%
-%%    Used by {@link cache/3}.  Defaults to `false'.
+%%    Used by {@link cache/3} and {@link cache/4}.  Defaults to `false'.
 %%  </li>
 %%  <li>
 %%    `auto_compress_mime_types': the list of mime-types that are compressed when
 %%    `auto_compress' is used.
 %%
-%%    Used by {@link cache/3}.  Defaults to
+%%    Used by {@link cache/3} and {@link cache/4}.  Defaults to
 %%    `[<<"text/html">>, <<"text/css">>, <<"text/plain">>, <<"text/xml">>, <<"text/javascript">>, <<"application/javascript">>, <<"application/json">>, <<"application/ld+json">>, <<"application/xml">>, <<"application/xhtml+xml">>, <<"application/rss+xml">>, <<"application/atom+xml">>, <<"image/svg+xml">>, <<"font/ttf">>, <<"font/eot">>, <<"font/otf">>, <<"font/opentype">> ]'
 %%  </li>
 %%  <li>
@@ -97,25 +194,30 @@
 %%    Does not decompress responses with strong etags (see
 %%    [https://bz.apache.org/bugzilla/show_bug.cgi?id=63932]).
 %%
-%%    Used by {@link get/2} and {@link cache/3}.  Defaults to `false'.
+%%    Used by {@link get/2}, {@link cache/3} and {@link cache/4}.  Defaults to `false'.
 %%  </li>
 %%  <li>
 %%    `bucket': an Erlang term to differentiate between different caches. For instance,
-%%    if using several shared caches together, this option can be used to differentiate
+%%    when what needs to use several private caches, this option can be used to differentiate
 %%    the cached responses and prevent them from being mixed up, potentially leaking
 %%    private data.
-%%    Used by {@link get/2} and {@link cache/3}. Defaults to the atom `default'.
+%%    Used by {@link get/2}, {@link cache/3} and {@link cache/4}. Defaults to the atom `default'.
 %%  </li>
 %%  <li>
-%%    `compression_threshold': compression threshold in bytes. Compressing very tiny
-%%    responses can result in actually bigger response (in addition to the performance
-%%    hit of compression it). There's no additional cost when this library serves a
+%%    `compression_threshold': compression threshold in bytes. Compressing a very tiny
+%%    response can result in actually bigger response (in addition to the performance
+%%    hit of compression it).
+%%
+%%    Although there's no additional cost when this library serves a
 %%    compressed file, but it has a cost on the client that has to decompress it.
+%%
+%%    This is why the default value is so high: we want to make sure that it's worth performing
+%%    compression and decompression.
 %%
 %%    See further discussion:
 %%    [https://webmasters.stackexchange.com/questions/31750/what-is-recommended-minimum-object-size-for-gzip-performance-benefits].
 %%
-%%    Used by {@link cache/3}. Defaults to the atom `1000'.
+%%    Used by {@link cache/3} and {@link cache/4}. Defaults to `1000'.
 %%  </li>
 %%  <li>
 %%    `origin_unreachable': indicates that the current cache using this library is unable to
@@ -127,20 +229,20 @@
 %%    `default_ttl': the default TTL, in seconds. This value is used when no TTL information
 %%    is found in the response, but the response is cacheable by default (see
 %%    [https://datatracker.ietf.org/doc/html/rfc7231#section-6.1]).
-%%    Used by {@link cache/3}. Defaults to `120'.
+%%    Used by {@link cache/3} and {@link cache/4}. Defaults to `120'.
 %%  </li>
 %%  <li>
 %%    `default_grace': the amount of time an expired response is kept in the cache. Such
 %%    a response is called a stale response, and can be returned in some circumstances, for
-%%    instance when the origin server returns an `5xx' error.
-%%    Use by {@link cache/3}. Defaults to `120'.
+%%    instance when the origin server returns an `5xx' error and `stale-if-error' header is used.
+%%    Use by {@link cache/3} and {@link cache/4}. Defaults to `120'.
 %%  </li>
 %%  <li>
 %%    `ignore_query_params_order': when a response is cached, a request key is computed based
 %%    on the method, URL and body. This option allows to keep the same request key for URLs
 %%    whose parameters are identical, but in different order. This helps increasing cache hit if
 %%    URL parameter order doesn't matter.
-%%    Used by {@link get/2} and {@link cache/3}. Defaults to `false'.
+%%    Used by {@link get/2}, {@link cache/3} and {@link cache/4}. Defaults to `false'.
 %%  </li>
 %%  <li>
 %%    `max_ranges': maximum number of range sets accepted when responding to a range request.
@@ -149,19 +251,19 @@
 %%    Used by {@link get/2}. Defaults to `100'.
 %%  </li>
 %%  <li>
-%%    `store': the store backend's module name.
+%%    `store': <b>required</b>, the store backend's module name.
 %%    Used by all functions, no defaults.
 %%  </li>
 %%  <li>
-%%    `type': cache type. A CDN is an example of a shared cache. A browser cache is an example
-%%    of a private cache.
-%%    Used by {@link get/2} and {@link cache/3}. Defaults to `shared'.
+%%    `type': <b>required</b>, cache type. `shared' or `private'. A CDN is an example of a shared cache. A browser cache
+%%    is an example of a private cache.
+%%    Used by {@link get/2}, {@link cache/3} and {@link cache/4}. Defaults to `shared'.
 %%  </li>
 %%  <li>
-%%    `request_time': the time the request was initiated. Setting this timestamp helps correcting
-%%    the age of the request between the time the request was made and the time the response
-%%    was received and cached, which can be several seconds.
-%%    Used by {@link cache/3}.
+%%    `request_time': the time the request was initiated, as a UNIX timestamp in seconds.
+%%    Setting this timestamp helps correcting the age of the request between the time the request
+%%    was made and the time the response was received and cached, which can be several seconds.
+%%    Used by {@link cache/3} and {@link cache/4}.
 %%  </li>
 %% </ul>
 -type opt() ::
@@ -183,6 +285,7 @@
     {request_time, non_neg_integer()}.
 -type invalidation_result() ::
     {ok, NbInvalidation :: non_neg_integer() | undefined} | {error, term()}.
+%% The invalidation result, with the count of deleted objects if the backend supports it
 
 %% `undefined' is returned if the backend does not support counting the number of
 %% invalidated responses.
@@ -256,7 +359,7 @@
 %%
 %% The function returns one of:
 %% <dl>
-%%    <dt>`{fresh, {response_ref(), response()}}'</dt>
+%%    <dt>`{fresh, {http_cache_store:response_ref() | not_found, response()}}'</dt>
 %%    <dd>
 %%    The response is fresh and can be returned directly to the client.
 %%
@@ -264,7 +367,7 @@
 %%    control request header is used and no suitable response was found.
 %%    In this case the request reference is set to `not_found'
 %%    </dd>
-%%    <dt>`{stale, {response_ref(), response()}}'</dt>
+%%    <dt>`{stale, {http_cache_store:response_ref(), response()}}'</dt>
 %%    <dd>
 %%    The response is stale but can be directly returned to the client.
 %%
@@ -280,7 +383,7 @@
 %%        <li>`origin_unreachable'</li>
 %%      </ul>
 %%    </dd>
-%%    <dt>`{must_revalidate, {response_ref(), response()}}'</dt>
+%%    <dt>`{must_revalidate, {http_cache_store:response_ref(), response()}}'</dt>
 %%    <dd>
 %%    The response must be revalidated.
 %%    </dd>
@@ -297,9 +400,9 @@
 %%------------------------------------------------------------------------------
 
 -spec get(request(), opts()) ->
-             {fresh, {response_ref(), response()}} |
-             {stale, {response_ref(), response()}} |
-             {must_revalidate, {response_ref(), response()}} |
+             {fresh, {http_cache_store:response_ref() | not_found, response()}} |
+             {stale, {http_cache_store:response_ref(), response()}} |
+             {must_revalidate, {http_cache_store:response_ref(), response()}} |
              miss.
 get(Request, Opts) ->
     try
@@ -381,7 +484,7 @@ postprocess_response(Freshness,
                      _RespMetadata,
                      _Opts)
     when Freshness == must_revalidate orelse Freshness == miss ->
-    {fresh, {undefined, {504, [], <<"">>}}};
+    {fresh, {not_found, {504, [], <<"">>}}};
 postprocess_response(miss,
                      _Request,
                      _ParsedReqHeaders,
@@ -425,7 +528,7 @@ transform_response(Request, ParsedReqHeaders, Response0, RespMetadata, Opts) ->
 %% last used time) when a response is used.
 %% @end
 %%------------------------------------------------------------------------------
--spec notify_use(http_cache:response_ref(), opts()) -> ok | {error, term()}.
+-spec notify_use(http_cache_store:response_ref(), opts()) -> ok | {error, term()}.
 notify_use(RespRef, Opts) ->
     #{store := Store} = normalize_opts(Opts),
     Store:notify_resp_used(RespRef, unix_now()).
@@ -436,16 +539,16 @@ notify_use(RespRef, Opts) ->
 %% This function never returns an error, even when the backend store returns one.
 %% Instead it returns `{ok, response()}' when the response is cacheable (even
 %% if an error occurs to actually save it) or `not_cacheable' when the response
-%% cannot be cached. When `{ok, response()}' is returned, the response should be
-%% returned to the client, because it can be modified depending on which options
-%% are enabled. For example, even an uncompressed text response must be returned
-%% with a `Vary: Content-Encoding' header when auto compression is enabled.
+%% cannot be cached.
 %%
-%% The returned response is subject to all the configured transformation
-%% (compression, range...).
+%% When `{ok, response()}' is returned, the response should be returned to the client
+%% instead of the initial response that was passed as a parameter, because it is
+%% transformed accordingly to the options passed: it can be compressed or uncompressed,
+%% and it will be returned as a range response if the request is a range
+%% request and the backend doesn't support it and returned a full response.
 %%
 %% This function shall be called with any response, even those known to be not
-%% cacheable, such as those of a `DELETE' request, because such non-cacheable request
+%% cacheable, such as `DELETE' requests, because such non-cacheable request
 %% can still have side effects on other cached objects
 %% (see [https://datatracker.ietf.org/doc/html/rfc7234#section-4.4]).
 %% In this example, a successful `DELETE' request triggers the
@@ -482,8 +585,8 @@ do_cache(Request, Response, NormOpts) ->
 %%
 %% When the returned response is a `304' (not modified) response, stored
 %% responses are updated and a response is returned from the 2 responses passed
-%% as a parameter. This is because stored response can not always be used: the
-%% revalidated response may have been deleted since.
+%% as a parameter. It's recommended to use the response returned by this function,
+%% because the `304' response is used to update headers of the revalidated response.
 %%
 %% Otherwise, {@link cache/3} is called.
 %%
@@ -679,11 +782,6 @@ do_invalidate_by_alternate_key(AltKey, #{store := _} = Opts) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
-
-%%%-------------------------------------------------------------------
-%% @doc http cache.
-%% @end
-%%%-------------------------------------------------------------------
 
 select_candidate(_ReqHeaders,
                  _ParsedReqHeaders,
@@ -1241,9 +1339,7 @@ handle_auto_decompress(ParsedReqHeaders,
             Response;
         false ->
             CompressedBody = get_body_content(BodyOrFile),
-            telemetry_start_measurement(decompress_time),
             DecompressedBody = zlib:gunzip(CompressedBody),
-            telemetry_stop_measurement(decompress_time),
             telemetry:execute(?TELEMETRY_DECOMPRESS_EVT, #{}, #{alg => gzip}),
             ContentLengthBin = list_to_binary(integer_to_list(byte_size(DecompressedBody))),
             RespHeaders1 = delete_header(<<"content-encoding">>, RespHeaders0),
@@ -1777,7 +1873,7 @@ log_invalidation_result({ok, NbInvalidation}, Type, InvalidationDur)
     {ok, NbInvalidation};
 log_invalidation_result({ok, undefined}, Type, InvalidationDur) ->
     telemetry:execute(?TELEMETRY_INVALIDATION_EVT,
-                      #{count => 1, duration => InvalidationDur},
+                      #{duration => InvalidationDur},
                       #{type => Type}),
     {ok, undefined};
 log_invalidation_result(Error, _Type, _InvlidationDur) ->
