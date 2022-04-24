@@ -24,7 +24,7 @@
 %% URL, body and bucket)
 -type response_ref() :: http_cache_store:response_ref().
 %% Opaque backend's reference to a response, returned by
-%% {@link http_cache:get/2} and used as a parameter by {@link http_cache:notify_use/2}.
+%% {@link http_cache:get/2} and used as a parameter by {@link http_cache:notify_response_used/2}.
 -type response_metadata() ::
     #{created := http_cache:timestamp(),
       expires := http_cache:timestamp(),
@@ -72,6 +72,7 @@
 %% Invalidates all responses for a given URL digest
 -callback invalidate_by_alternate_key([AltKeys :: http_cache:alternate_key()]) ->
                                          http_cache:invalidation_result().
+
 %% Invalidates all responses that has been tag with one of the alternate keys
 
 -optional_callbacks([invalidate_by_alternate_key/1]).

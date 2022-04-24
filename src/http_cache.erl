@@ -106,7 +106,7 @@
 -module(http_cache).
 
 %% API exports
--export([get/2, notify_use/2, cache/3, cache/4, invalidate_url/2,
+-export([get/2, notify_response_used/2, cache/3, cache/4, invalidate_url/2,
          invalidate_by_alternate_key/2]).
 
 -export_type([alternate_key/0, headers/0, response/0, status/0, timestamp/0]).
@@ -285,6 +285,7 @@
     {request_time, non_neg_integer()}.
 -type invalidation_result() ::
     {ok, NbInvalidation :: non_neg_integer() | undefined} | {error, term()}.
+
 %% The invalidation result, with the count of deleted objects if the backend supports it
 
 %% `undefined' is returned if the backend does not support counting the number of
@@ -393,7 +394,7 @@
 %%
 %% Using this function does not automatically updates the last used time of the
 %% object in the cache, because a returned response may or may not be returned to
-%% the caller. Therefore, use {@link notify_use/2} with the
+%% the caller. Therefore, use {@link notify_response_used/2} with the
 %% returned response reference when a cached response is used.
 %%
 %% @end
@@ -528,8 +529,9 @@ transform_response(Request, ParsedReqHeaders, Response0, RespMetadata, Opts) ->
 %% last used time) when a response is used.
 %% @end
 %%------------------------------------------------------------------------------
--spec notify_use(http_cache_store:response_ref(), opts()) -> ok | {error, term()}.
-notify_use(RespRef, Opts) ->
+-spec notify_response_used(http_cache_store:response_ref(), opts()) ->
+                              ok | {error, term()}.
+notify_response_used(RespRef, Opts) ->
     #{store := Store} = normalize_opts(Opts),
     Store:notify_resp_used(RespRef, unix_now()).
 
