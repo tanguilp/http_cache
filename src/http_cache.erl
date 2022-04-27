@@ -533,7 +533,7 @@ transform_response(Request, ParsedReqHeaders, Response0, RespMetadata, Opts) ->
                               ok | {error, term()}.
 notify_response_used(RespRef, Opts) ->
     #{store := Store} = normalize_opts(Opts),
-    Store:notify_resp_used(RespRef, unix_now()).
+    Store:notify_response_used(RespRef, unix_now()).
 
 %%------------------------------------------------------------------------------
 %% @doc Caches a response

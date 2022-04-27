@@ -64,7 +64,7 @@
               RespMetadata :: response_metadata()) ->
                  ok | {error, term()}.
 %% Saves a response and associated metadata
--callback notify_resp_used(RespRef :: response_ref(), Time :: http_cache:timestamp()) ->
+-callback notify_response_used(RespRef :: response_ref(), Time :: http_cache:timestamp()) ->
                               ok | {error, term()}.
 %% Notify that a response was used. A LRU cache, for instance, would update the timestamp
 %% the response was last used
