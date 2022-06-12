@@ -63,9 +63,7 @@
               RespMetadata :: response_metadata()) ->
                  ok | {error, term()}.
 %% Saves a response and associated metadata
--callback notify_response_used(RespRef :: response_ref(),
-                               Time :: http_cache:timestamp()) ->
-                                  ok | {error, term()}.
+-callback notify_response_used(RespRef :: response_ref()) -> ok | {error, term()}.
 %% Notify that a response was used. A LRU cache, for instance, would update the timestamp
 %% the response was last used
 -callback invalidate_url(UrlDigest :: url_digest()) -> http_cache:invalidation_result().

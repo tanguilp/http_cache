@@ -14,7 +14,7 @@
 -behaviour(http_cache_store).
 
 -export([list_candidates/1, get_response/1, put/5, invalidate_url/1,
-         invalidate_by_alternate_key/1, notify_response_used/2, save_in_file/0]).
+         invalidate_by_alternate_key/1, notify_response_used/1, save_in_file/0]).
 
 list_candidates(ReqKey) ->
     Now = unix_now(),
@@ -68,10 +68,10 @@ invalidate_by_alternate_key(Searched) ->
     [erase(RespRef) || RespRef <- ToInvalidate],
     {ok, NbInvalidated}.
 
-notify_response_used(RespRef, Time) ->
+notify_response_used(RespRef) ->
     case get(RespRef) of
         {Response, UrlDigest, RespMetadata, _LastUsed} ->
-            put(RespRef, {Response, UrlDigest, RespMetadata, Time});
+            put(RespRef, {Response, UrlDigest, RespMetadata, unix_now()});
         undefined ->
             ok
     end.
