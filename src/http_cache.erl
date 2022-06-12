@@ -325,6 +325,12 @@
           <<"if-none-match">> => [],
           <<"vary">> => []}).
 -define(KV_HEADERS, #{<<"accept-encoding">> => [], <<"cache-control">> => []}).
+-define(RESP_HEADERS_TO_DELETE,
+        #{<<"connection">> => [],
+          <<"proxy-connection">> => [],
+          <<"keep-alive">> => [],
+          <<"transfer-encoding">> => [],
+          <<"upgrade">> => []}).
 -define(DEFAULT_OPTS,
         #{allow_stale_while_revalidate => false,
           allow_stale_if_error => false,
@@ -706,6 +712,7 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
         set_header_value(<<"content-length">>,
                          list_to_binary(integer_to_list(byte_size(RespBodyBin))),
                          RespHeaders0),
+    RespHeaders2 = strip_connection_headers(RespHeaders1),
     RequestKey = request_key(Request, Opts),
     VaryHeaders = vary_headers(ReqHeaders0, ParsedRespHeaders),
     MaybeAge = maps:get(<<"age">>, ParsedRespHeaders, undefined),
@@ -713,7 +720,7 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
     CreatedAt = created_at(MaybeAge, MaybeDate, Opts),
     {TTLSetBy, Expires} = expires(CreatedAt, MaybeDate, ParsedRespHeaders, Opts),
     UrlDigest = url_digest(Url, Opts),
-    Response = {Status, RespHeaders1, RespBodyBin},
+    Response = {Status, RespHeaders2, RespBodyBin},
     RespMetadata =
         #{created => CreatedAt,
           expires => Expires,
@@ -1827,6 +1834,16 @@ parsed_content_type_to_string({MainType, SubType, Params}) ->
     JoinedParams =
         iolist_to_binary([<<"; ", Name/binary, "=", Value/binary>> || {Name, Value} <- Params]),
     <<MainType/binary, "/", SubType/binary, JoinedParams/binary>>.
+
+strip_connection_headers([]) ->
+    [];
+strip_connection_headers([{Name, Value} | Rest]) ->
+    case is_map_key(?LOWER(Name), ?RESP_HEADERS_TO_DELETE) of
+        true ->
+            strip_connection_headers(Rest);
+        false ->
+            [{Name, Value} | strip_connection_headers(Rest)]
+    end.
 
 get_body_content({file, FilePath}) ->
     {ok, Content} = file:read_file(FilePath),

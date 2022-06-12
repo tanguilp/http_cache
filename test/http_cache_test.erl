@@ -1,5 +1,6 @@
 -module(http_cache_test).
 
+-include_lib("cowlib/include/cow_inline.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(TEST_URL, <<"https://www.example.com">>).
@@ -33,6 +34,7 @@ http_cache_test_() ->
       fun rfc9111_section_3_resp_has_maxage_ccdir/1,
       fun rfc9111_section_3_resp_has_smaxage_ccdir/1,
       fun rfc9111_section_3_resp_has_public_ccdir/1,
+      fun rfc9111_section_3_1_discard_connection_headers/1,
       fun rfc9111_section_3_1_range_response_not_cached/1,
       fun rfc9111_section_3_2_authorization_header_caching/1,
       fun rfc9111_section_4_req_nocache_ccdir/1, fun rfc9111_section_4_resp_nocache_ccdir/1,
@@ -703,6 +705,28 @@ rfc9111_section_3_resp_has_public_ccdir(Opts) ->
                                     Opts))
      || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES].
 
+rfc9111_section_3_1_discard_connection_headers(Opts) ->
+    {spawn,
+     begin
+         http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                          {200,
+                           [{<<"Connection">>, <<"Keep-Alive">>},
+                            {<<"Proxy-Connection">>, <<"Keep-Alive">>},
+                            {<<"Keep-Alive">>, <<"timeout=5, max=1000">>},
+                            {<<"Transfer-Encoding">>, <<"gzip">>},
+                            {<<"Upgrade">>, <<"foo/2">>}],
+                           <<"Some content">>},
+                          Opts),
+         {fresh, {_, {_, RespHeaders0, _}}} =
+             http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts),
+         RespHeaders1 = [{?LOWER(Name), Value} || {Name, Value} <- RespHeaders0],
+         [?_assertEqual(undefined, proplists:get_value(<<"connection">>, RespHeaders1)),
+          ?_assertEqual(undefined, proplists:get_value(<<"proxy-connection">>, RespHeaders1)),
+          ?_assertEqual(undefined, proplists:get_value(<<"keep-alive">>, RespHeaders1)),
+          ?_assertEqual(undefined, proplists:get_value(<<"transfer-encoding">>, RespHeaders1)),
+          ?_assertEqual(undefined, proplists:get_value(<<"upgrade">>, RespHeaders1))]
+     end}.
+
 rfc9111_section_3_1_range_response_not_cached(Opts) ->
     [?_assertMatch(not_cacheable,
                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
@@ -733,14 +757,6 @@ rfc9111_section_3_2_authorization_header_caching(Opts) ->
       || Method <- ?CACHEABLE_METHODS,
          Status <- ?DEFAULT_CACHEABLE_STATUSES,
          CacheControlOpt <- [<<"must-revalidate">>, <<"public">>, <<"s-maxage=3600">>]]].
-
-%TODO: should we support this?
-%rfc9111_section_4_head_of_get(Opts) ->
-%  F = fun() -> http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>}, {200, [], <<"Some content">>}, Opts) end,
-%  {
-%    spawn,
-%    ?_assertMatch({ok, _}, begin F(), http_cache:get({<<"HEAD">>, ?TEST_URL, [], <<"">>}, Opts) end)
-%  }.
 
 rfc9111_section_4_req_nocache_ccdir(Opts) ->
     [begin
