@@ -27,72 +27,75 @@ http_cache_test_() ->
       fun invalidate_by_alternate_keys/1, fun response_stored_in_file_by_backend/1,
       fun cache_3_transforms_response_compression/1, fun cache_3_transforms_response_range/1,
       fun cache_4_transforms_response_compression/1, fun cache_4_transforms_response_range/1,
-      fun rfc7234_section_3_method_cacheable/1, fun rfc7234_section_3_nostore_absent/1,
-      fun rfc7234_section_3_private_absent/1, fun rfc7234_section_3_authz_header/1,
-      fun rfc7234_section_3_resp_has_expires_ccdir/1,
-      fun rfc7234_section_3_resp_has_maxage_ccdir/1,
-      fun rfc7234_section_3_resp_has_smaxage_ccdir/1,
-      fun rfc7234_section_3_resp_has_public_ccdir/1,
-      fun rfc7234_section_3_1_range_response_not_cached/1,
-      fun rfc7234_section_3_2_authorization_header_caching/1,
-      fun rfc7234_section_4_req_nocache_ccdir/1, fun rfc7234_section_4_resp_nocache_ccdir/1,
-      fun rfc7234_section_4_age_resp_header_generated/1,
-      fun rfc7234_section_4_most_recent_resp/1, fun rfc7234_section_4_1_vary_header/1,
-      fun rfc7234_section_4_2_stale_on_expired/1, fun rfc7234_section_4_2_1_smaxage_shared/1,
-      fun rfc7234_section_4_2_1_smaxage_private/1, fun rfc7234_section_4_2_1_maxage/1,
-      fun rfc7234_section_4_2_1_expires/1, fun rfc7234_section_4_2_2_heuristics_no_used/1,
-      fun rfc7234_section_4_2_3_age_no_date_header/1,
-      fun rfc7234_section_4_2_3_age_with_date_header/1,
-      fun rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_cache/1,
-      fun rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_store/1,
-      fun rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate/1,
-      fun rfc7234_section_4_2_4_stale_returned_resp_ccdir_proxy_revalidate_priv_cache/1,
-      fun rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_proxy_revalidate_shared_cache/1,
-      fun rfc7234_section_4_3_2_if_none_match_strong_etag/1,
-      fun rfc7234_section_4_3_2_if_none_match_weak_etag/1,
-      fun rfc7234_section_4_3_2_if_none_match_precondition_failed_for_side_effect_methods/1,
-      fun rfc7234_section_4_3_2_if_modified_since/1,
-      fun rfc7234_section_4_3_2_if_none_match_has_precedence_over_if_modified_since/1,
-      fun rfc7234_section_4_3_2_if_range_with_etag/1,
-      fun rfc7234_section_4_3_2_if_range_with_date/1,
-      fun rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag/1,
-      fun rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag_revalidation/1,
-      fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified/1,
-      fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified_revalidation/1,
-      fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag/1,
-      fun rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidation/1,
-      fun rfc7234_section_4_3_4_cached_response_updated_with_no_validator/1,
-      fun rfc7234_section_4_3_4_cached_response_updated_with_no_validator_revalidation/1,
-      fun rfc7234_section_4_3_5_cached_response_updated_with_etag_matching/1,
-      fun rfc7234_section_4_3_5_cached_response_updated_with_etag_matching_and_content_length/1,
-      fun rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching/1,
-      fun rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching_and_content_length/1,
-      fun rfc7234_section_4_3_5_cached_response_invalidated_no_validator/1,
-      fun rfc7234_section_4_3_5_cached_response_invalidated_no_validator_get_resp/1,
-      fun rfc7234_section_4_3_5_cached_response_invalidated_no_validator_head_resp/1,
-      fun rfc7234_section_4_3_5_cached_response_invalidated_content_length_mismatch/1,
-      fun rfc7234_section_4_3_5_ignore_when_status_code_is_not_200/1,
-      fun rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status/1,
-      fun rfc7234_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status/1,
+      fun rfc9111_section_3_method_cacheable/1, fun rfc9111_section_3_nostore_absent/1,
+      fun rfc9111_section_3_private_absent/1, fun rfc9111_section_3_authz_header/1,
+      fun rfc9111_section_3_resp_has_expires_ccdir/1,
+      fun rfc9111_section_3_resp_has_maxage_ccdir/1,
+      fun rfc9111_section_3_resp_has_smaxage_ccdir/1,
+      fun rfc9111_section_3_resp_has_public_ccdir/1,
+      fun rfc9111_section_3_1_range_response_not_cached/1,
+      fun rfc9111_section_3_2_authorization_header_caching/1,
+      fun rfc9111_section_4_req_nocache_ccdir/1, fun rfc9111_section_4_resp_nocache_ccdir/1,
+      fun rfc9111_section_4_age_resp_header_generated/1,
+      fun rfc9111_section_4_most_recent_resp/1, fun rfc9111_section_4_1_vary_header/1,
+      fun rfc9111_section_4_2_stale_on_expired/1, fun rfc9111_section_4_2_1_smaxage_shared/1,
+      fun rfc9111_section_4_2_1_smaxage_private/1, fun rfc9111_section_4_2_1_maxage/1,
+      fun rfc9111_section_4_2_1_expires/1, fun rfc9111_section_4_2_2_heuristics_no_used/1,
+      fun rfc9111_section_4_2_3_age_no_date_header/1,
+      fun rfc9111_section_4_2_3_age_with_date_header/1,
+      fun rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_no_cache/1,
+      fun rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_no_store/1,
+      fun rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate/1,
+      fun rfc9111_section_4_2_4_stale_returned_resp_ccdir_proxy_revalidate_priv_cache/1,
+      fun rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_proxy_revalidate_shared_cache/1,
+      fun rfc9111_section_4_3_2_if_none_match_strong_etag/1,
+      fun rfc9111_section_4_3_2_if_none_match_weak_etag/1,
+      fun rfc9111_section_4_3_2_if_none_match_precondition_failed_for_side_effect_methods/1,
+      fun rfc9111_section_4_3_2_if_modified_since/1,
+      fun rfc9111_section_4_3_2_if_none_match_has_precedence_over_if_modified_since/1,
+      fun rfc9111_section_4_3_2_if_range_with_etag/1,
+      fun rfc9111_section_4_3_2_if_range_with_date/1,
+      fun rfc9111_section_4_3_4_cached_response_updated_with_strong_validator_etag/1,
+      fun rfc9111_section_4_3_4_cached_response_updated_with_strong_validator_etag_revalidation/1,
+      fun rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_last_modified/1,
+      fun rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_last_modified_revalidation/1,
+      fun rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_etag/1,
+      fun rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidation/1,
+      fun rfc9111_section_4_3_4_cached_response_updated_with_no_validator/1,
+      fun rfc9111_section_4_3_4_cached_response_updated_with_no_validator_revalidation/1,
+      fun rfc9111_section_4_3_5_cached_response_updated_with_etag_matching/1,
+      fun rfc9111_section_4_3_5_cached_response_updated_with_etag_matching_and_content_length/1,
+      fun rfc9111_section_4_3_5_cached_response_updated_with_last_modified_matching/1,
+      fun rfc9111_section_4_3_5_cached_response_updated_with_last_modified_matching_and_content_length/1,
+      fun rfc9111_section_4_3_5_cached_response_invalidated_no_validator/1,
+      fun rfc9111_section_4_3_5_cached_response_invalidated_no_validator_get_resp/1,
+      fun rfc9111_section_4_3_5_cached_response_invalidated_no_validator_head_resp/1,
+      fun rfc9111_section_4_3_5_cached_response_invalidated_content_length_mismatch/1,
+      fun rfc9111_section_4_3_5_ignore_when_status_code_is_not_200/1,
+      fun rfc9111_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status/1,
+      fun rfc9111_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status/1,
       %TODO
-      %fun rfc7234_section_5_2_cache_control_formatting/1,
-      fun rfc7234_section_5_2_1_1_ccdir_max_age/1,
-      fun rfc7234_section_5_2_1_2_ccdir_max_stale/1,
-      fun rfc7234_section_5_2_1_3_ccdir_min_fresh/1,
-      fun rfc7234_section_5_2_1_4_ccdir_no_cache/1,
-      fun rfc7234_section_5_2_1_5_ccdir_no_store/1,
-      fun rfc7234_section_5_2_1_7_ccdir_only_if_cached/1,
-      fun rfc7234_section_5_2_2_1_ccdir_must_revalidate/1,
-      fun rfc7234_section_5_2_2_2_ccdir_no_cache/1,
-      fun rfc7234_section_5_2_2_3_ccdir_no_store/1,
-      fun rfc7234_section_5_2_2_4_ccdir_no_transform_auto_compress/1,
-      fun rfc7234_section_5_2_2_4_ccdir_no_transform_auto_decompress/1,
-      fun rfc7234_section_5_2_2_4_ccdir_no_transform_range/1,
-      fun rfc7234_section_5_2_2_5_ccdir_public/1, fun rfc7234_section_5_2_2_6_ccdir_private/1,
-      fun rfc7234_section_5_2_2_7_ccdir_proxy_revalidate/1,
-      fun rfc7234_section_5_2_2_8_ccdir_max_age/1, fun rfc7234_section_5_2_2_9_ccdir_s_maxage/1,
-      fun rfc7234_section_5_3_header_expires_malformed/1,
-      fun rfc7234_section_5_3_header_expires/1, fun rfc7234_section_5_4_header_pragma/1,
+      %fun rfc9111_section_5_2_cache_control_formatting/1,
+      fun rfc9111_section_5_2_1_1_ccdir_max_age/1,
+      fun rfc9111_section_5_2_1_2_ccdir_max_stale/1,
+      fun rfc9111_section_5_2_1_3_ccdir_min_fresh/1,
+      fun rfc9111_section_5_2_1_4_ccdir_no_cache/1,
+      fun rfc9111_section_5_2_1_5_ccdir_no_store/1,
+      fun rfc9111_section_5_2_1_7_ccdir_only_if_cached/1,
+      fun rfc9111_section_5_2_2_1_ccdir_max_age/1,
+      fun rfc9111_section_5_2_2_2_ccdir_must_revalidate/1,
+      fun rfc9111_section_5_2_2_4_ccdir_no_cache/1,
+      fun rfc9111_section_5_2_2_4_ccdir_no_cache_qualified_ignored/1,
+      fun rfc9111_section_5_2_2_5_ccdir_no_store/1,
+      fun rfc9111_section_5_2_2_6_ccdir_no_transform_auto_compress/1,
+      fun rfc9111_section_5_2_2_6_ccdir_no_transform_auto_decompress/1,
+      fun rfc9111_section_5_2_2_6_ccdir_no_transform_range/1,
+      fun rfc9111_section_5_2_2_7_ccdir_private/1,
+      fun rfc9111_section_5_2_2_7_ccdir_private_qualified_ignored/1,
+      fun rfc9111_section_5_2_2_8_ccdir_proxy_revalidate/1,
+      fun rfc9111_section_5_2_2_9_ccdir_public/1, fun rfc9111_section_5_2_2_10_ccdir_s_maxage/1,
+      fun rfc9111_section_5_3_header_expires_malformed/1,
+      fun rfc9111_section_5_3_header_expires/1, fun rfc9111_section_5_4_header_pragma/1,
       fun rfc5861_stale_while_revalidate_not_expired/1,
       fun rfc5861_stale_while_revalidate_expired/1,
       fun rfc5861_stale_if_error_req_not_expired/1, fun rfc5861_stale_if_error_req_expired/1,
@@ -578,7 +581,7 @@ cache_4_transforms_response_range(Opts) ->
                                         Opts)
                    end)}.
 
-rfc7234_section_3_method_cacheable(Opts) ->
+rfc9111_section_3_method_cacheable(Opts) ->
     [?_assertMatch({ok, _},
                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status, [], <<"Some content">>},
@@ -594,7 +597,7 @@ rfc7234_section_3_method_cacheable(Opts) ->
                    {<<"expires">>, timestamp_to_rfc7231(unix_now() + 3600)}],
            Status <- ?DEFAULT_CACHEABLE_STATUSES].
 
-rfc7234_section_3_nostore_absent(Opts) ->
+rfc9111_section_3_nostore_absent(Opts) ->
     [[?_assertMatch(not_cacheable,
                     http_cache:cache({Method,
                                       ?TEST_URL,
@@ -611,7 +614,7 @@ rfc7234_section_3_nostore_absent(Opts) ->
                                      Opts))
       || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES]].
 
-rfc7234_section_3_private_absent(Opts) ->
+rfc9111_section_3_private_absent(Opts) ->
     [[?_assertMatch(not_cacheable,
                     http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
@@ -627,7 +630,7 @@ rfc7234_section_3_private_absent(Opts) ->
                                      set_opt(type, private, Opts)))
       || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES]].
 
-rfc7234_section_3_authz_header(Opts) ->
+rfc9111_section_3_authz_header(Opts) ->
     [[?_assertMatch(not_cacheable,
                     http_cache:cache({Method,
                                       ?TEST_URL,
@@ -657,7 +660,7 @@ rfc7234_section_3_authz_header(Opts) ->
          Status <- ?DEFAULT_CACHEABLE_STATUSES,
          CacheControlOpt <- [<<"must-revalidate">>, <<"public">>, <<"s-maxage=3600">>]]].
 
-rfc7234_section_3_resp_has_expires_ccdir(Opts) ->
+rfc9111_section_3_resp_has_expires_ccdir(Opts) ->
     [?_assertMatch({ok, _},
                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status,
@@ -666,7 +669,7 @@ rfc7234_section_3_resp_has_expires_ccdir(Opts) ->
                                     Opts))
      || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES].
 
-rfc7234_section_3_resp_has_maxage_ccdir(Opts) ->
+rfc9111_section_3_resp_has_maxage_ccdir(Opts) ->
     [?_assertMatch({ok, _},
                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status,
@@ -675,7 +678,7 @@ rfc7234_section_3_resp_has_maxage_ccdir(Opts) ->
                                     Opts))
      || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES].
 
-rfc7234_section_3_resp_has_smaxage_ccdir(Opts) ->
+rfc9111_section_3_resp_has_smaxage_ccdir(Opts) ->
     [[?_assertMatch({ok, _},
                     http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
@@ -691,7 +694,7 @@ rfc7234_section_3_resp_has_smaxage_ccdir(Opts) ->
                                      set_opt(type, private, Opts)))
       || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES]].
 
-rfc7234_section_3_resp_has_public_ccdir(Opts) ->
+rfc9111_section_3_resp_has_public_ccdir(Opts) ->
     [?_assertMatch({ok, _},
                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status,
@@ -700,7 +703,7 @@ rfc7234_section_3_resp_has_public_ccdir(Opts) ->
                                     Opts))
      || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES].
 
-rfc7234_section_3_1_range_response_not_cached(Opts) ->
+rfc9111_section_3_1_range_response_not_cached(Opts) ->
     [?_assertMatch(not_cacheable,
                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {206,
@@ -709,7 +712,7 @@ rfc7234_section_3_1_range_response_not_cached(Opts) ->
                                     Opts))
      || Method <- ?CACHEABLE_METHODS].
 
-rfc7234_section_3_2_authorization_header_caching(Opts) ->
+rfc9111_section_3_2_authorization_header_caching(Opts) ->
     [[?_assertMatch(not_cacheable,
                     http_cache:cache({Method,
                                       ?TEST_URL,
@@ -732,14 +735,14 @@ rfc7234_section_3_2_authorization_header_caching(Opts) ->
          CacheControlOpt <- [<<"must-revalidate">>, <<"public">>, <<"s-maxage=3600">>]]].
 
 %TODO: should we support this?
-%rfc7234_section_4_head_of_get(Opts) ->
+%rfc9111_section_4_head_of_get(Opts) ->
 %  F = fun() -> http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>}, {200, [], <<"Some content">>}, Opts) end,
 %  {
 %    spawn,
 %    ?_assertMatch({ok, _}, begin F(), http_cache:get({<<"HEAD">>, ?TEST_URL, [], <<"">>}, Opts) end)
 %  }.
 
-rfc7234_section_4_req_nocache_ccdir(Opts) ->
+rfc9111_section_4_req_nocache_ccdir(Opts) ->
     [begin
          F = fun() ->
                 http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -759,7 +762,7 @@ rfc7234_section_4_req_nocache_ccdir(Opts) ->
      end
      || CCHeader <- [<<"pragma">>, <<"cache-control">>]].
 
-rfc7234_section_4_resp_nocache_ccdir(Opts) ->
+rfc9111_section_4_resp_nocache_ccdir(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Resp = {200, [{<<"cache-control">>, <<"no-cache">>}], <<"Some content">>},
     Store = fun() -> http_cache:cache(Req, Resp, Opts) end,
@@ -770,7 +773,7 @@ rfc7234_section_4_resp_nocache_ccdir(Opts) ->
                        http_cache:get(Req, Opts)
                    end)}.
 
-rfc7234_section_4_age_resp_header_generated(Opts) ->
+rfc9111_section_4_age_resp_header_generated(Opts) ->
     F = fun() ->
            http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [{<<"age">>, <<"42">>}], <<"Some content">>},
@@ -781,7 +784,7 @@ rfc7234_section_4_age_resp_header_generated(Opts) ->
         end,
     {spawn, ?_assertEqual([<<"42">>], F())}.
 
-rfc7234_section_4_most_recent_resp(Opts) ->
+rfc9111_section_4_most_recent_resp(Opts) ->
     % Actually they are the same request (same request key) so the second will erase the
     % first. But we keep the test just in case (and to make it future-proof)
     F = fun() ->
@@ -801,7 +804,7 @@ rfc7234_section_4_most_recent_resp(Opts) ->
         end,
     {spawn, ?_assertEqual([<<"1">>], F())}.
 
-rfc7234_section_4_1_vary_header(Opts) ->
+rfc9111_section_4_1_vary_header(Opts) ->
     Vary =
         fun() ->
            http_cache:cache({<<"GET">>, ?TEST_URL, [{<<"tEst">>, <<"val">>}], <<"">>},
@@ -958,7 +961,7 @@ rfc7234_section_4_1_vary_header(Opts) ->
                        end)],
     [{spawn, Test} || Test <- Tests].
 
-rfc7234_section_4_2_stale_on_expired(Opts) ->
+rfc9111_section_4_2_stale_on_expired(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"max-stale=10">>}], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -974,7 +977,7 @@ rfc7234_section_4_2_stale_on_expired(Opts) ->
                        http_cache:get(Req, Opts)
                    end)}.
 
-rfc7234_section_4_2_1_smaxage_shared(Opts) ->
+rfc9111_section_4_2_1_smaxage_shared(Opts) ->
     Store = proplists:get_value(store, Opts),
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -990,7 +993,7 @@ rfc7234_section_4_2_1_smaxage_shared(Opts) ->
         end,
     {spawn, ?_assertEqual(unix_now() + 3, F())}.
 
-rfc7234_section_4_2_1_smaxage_private(Opts) ->
+rfc9111_section_4_2_1_smaxage_private(Opts) ->
     Store = proplists:get_value(store, Opts),
     OptsPriv = set_opt(type, private, Opts),
     F = fun() ->
@@ -1007,7 +1010,7 @@ rfc7234_section_4_2_1_smaxage_private(Opts) ->
         end,
     {spawn, ?_assertEqual(unix_now() + 5, F())}.
 
-rfc7234_section_4_2_1_maxage(Opts) ->
+rfc9111_section_4_2_1_maxage(Opts) ->
     Store = proplists:get_value(store, Opts),
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -1023,7 +1026,7 @@ rfc7234_section_4_2_1_maxage(Opts) ->
         end,
     {spawn, ?_assertEqual(unix_now() + 5, F())}.
 
-rfc7234_section_4_2_1_expires(Opts) ->
+rfc9111_section_4_2_1_expires(Opts) ->
     Store = proplists:get_value(store, Opts),
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -1038,7 +1041,7 @@ rfc7234_section_4_2_1_expires(Opts) ->
         end,
     {spawn, ?_assertEqual(unix_now() + 7, F())}.
 
-rfc7234_section_4_2_2_heuristics_no_used(Opts) ->
+rfc9111_section_4_2_2_heuristics_no_used(Opts) ->
     Store = proplists:get_value(store, Opts),
     TTL = proplists:get_value(default_ttl, Opts),
     F = fun() ->
@@ -1054,7 +1057,7 @@ rfc7234_section_4_2_2_heuristics_no_used(Opts) ->
         end,
     {spawn, ?_assertNotEqual(unix_now() + TTL, F())}.
 
-rfc7234_section_4_2_3_age_no_date_header(Opts) ->
+rfc9111_section_4_2_3_age_no_date_header(Opts) ->
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req, {200, [], <<"Some content">>}, Opts),
@@ -1063,7 +1066,7 @@ rfc7234_section_4_2_3_age_no_date_header(Opts) ->
         end,
     {spawn, ?_assertEqual(F(), <<"0">>)}.
 
-rfc7234_section_4_2_3_age_with_date_header(Opts) ->
+rfc9111_section_4_2_3_age_with_date_header(Opts) ->
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            TwoMinutesAgo = timestamp_to_rfc7231(unix_now() - 2 * 60),
@@ -1073,7 +1076,7 @@ rfc7234_section_4_2_3_age_with_date_header(Opts) ->
         end,
     {spawn, ?_assertEqual(F(), <<"120">>)}.
 
-rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_cache(Opts) ->
+rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_no_cache(Opts) ->
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1083,7 +1086,7 @@ rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_cache(Opts) ->
         end,
     {spawn, ?_assertMatch({must_revalidate, _}, F())}.
 
-rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_store(Opts) ->
+rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_no_store(Opts) ->
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1096,7 +1099,7 @@ rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_no_store(Opts) ->
         end,
     {spawn, ?_assertEqual(miss, F())}.
 
-rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate(Opts) ->
+rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate(Opts) ->
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1109,7 +1112,7 @@ rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate(Opts) ->
         end,
     {spawn, ?_assertMatch({must_revalidate, _}, F())}.
 
-rfc7234_section_4_2_4_stale_returned_resp_ccdir_proxy_revalidate_priv_cache(Opts) ->
+rfc9111_section_4_2_4_stale_returned_resp_ccdir_proxy_revalidate_priv_cache(Opts) ->
     OptsPriv = set_opt(type, private, Opts),
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -1122,7 +1125,7 @@ rfc7234_section_4_2_4_stale_returned_resp_ccdir_proxy_revalidate_priv_cache(Opts
         end,
     {spawn, ?_assertMatch({fresh, _}, F())}.
 
-rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_proxy_revalidate_shared_cache(Opts) ->
+rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_proxy_revalidate_shared_cache(Opts) ->
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1135,7 +1138,7 @@ rfc7234_section_4_2_4_no_stale_returned_resp_ccdir_proxy_revalidate_shared_cache
         end,
     {spawn, ?_assertMatch({must_revalidate, _}, F())}.
 
-rfc7234_section_4_3_2_if_none_match_strong_etag(Opts) ->
+rfc9111_section_4_3_2_if_none_match_strong_etag(Opts) ->
     F = fun(Method, ReqHeaders) ->
            http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                             {200, [{<<"etag">>, <<"\"some-etag\"">>}], <<"Some content">>},
@@ -1160,7 +1163,7 @@ rfc7234_section_4_3_2_if_none_match_strong_etag(Opts) ->
                      F(Method, [{<<"if-none-match">>, <<"\"another-etag\"">>}]))}]
      || Method <- [<<"GET">>, <<"HEAD">>]].
 
-rfc7234_section_4_3_2_if_none_match_weak_etag(Opts) ->
+rfc9111_section_4_3_2_if_none_match_weak_etag(Opts) ->
     F = fun(Method, ReqHeaders) ->
            http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                             {200, [{<<"etag">>, <<"W/\"some-etag\"">>}], <<"Some content">>},
@@ -1185,7 +1188,7 @@ rfc7234_section_4_3_2_if_none_match_weak_etag(Opts) ->
                      F(Method, [{<<"if-none-match">>, <<"W/\"another-etag\"">>}]))}]
      || Method <- [<<"GET">>, <<"HEAD">>]].
 
-rfc7234_section_4_3_2_if_none_match_precondition_failed_for_side_effect_methods(Opts) ->
+rfc9111_section_4_3_2_if_none_match_precondition_failed_for_side_effect_methods(Opts) ->
     F = fun() ->
            Req = {<<"POST">>, ?TEST_URL, [{<<"if-none-match">>, <<"\"some-etag\"">>}], <<"">>},
            http_cache:cache(Req,
@@ -1198,7 +1201,7 @@ rfc7234_section_4_3_2_if_none_match_precondition_failed_for_side_effect_methods(
         end,
     {spawn, ?_assertMatch({fresh, {_, {412, _, _}}}, F())}.
 
-rfc7234_section_4_3_2_if_modified_since(Opts) ->
+rfc9111_section_4_3_2_if_modified_since(Opts) ->
     Past = timestamp_to_rfc7231(unix_now() - 10),
     Now = timestamp_to_rfc7231(unix_now()),
     Future = timestamp_to_rfc7231(unix_now() + 10),
@@ -1237,7 +1240,7 @@ rfc7234_section_4_3_2_if_modified_since(Opts) ->
                      F(Method, [], [{<<"if-modified-since">>, Future}]))}]
      || Method <- [<<"GET">>, <<"HEAD">>]].
 
-rfc7234_section_4_3_2_if_none_match_has_precedence_over_if_modified_since(Opts) ->
+rfc9111_section_4_3_2_if_none_match_has_precedence_over_if_modified_since(Opts) ->
     Now = timestamp_to_rfc7231(unix_now()),
     Future = timestamp_to_rfc7231(unix_now() + 10),
     F = fun(Method, ReqHeaders, RespHeaders) ->
@@ -1265,7 +1268,7 @@ rfc7234_section_4_3_2_if_none_match_has_precedence_over_if_modified_since(Opts) 
                        [{<<"etag">>, <<"\"some-etag\"">>}, {<<"last-modified">>, Now}]))}]
      || Method <- [<<"GET">>, <<"HEAD">>]].
 
-rfc7234_section_4_3_2_if_range_with_etag(Opts) ->
+rfc9111_section_4_3_2_if_range_with_etag(Opts) ->
     F = fun(ReqHeaders, RespHeaders) ->
            http_cache:cache({<<"GET">>, ?TEST_URL, [], <<>>},
                             {200, RespHeaders, <<"Some content">>},
@@ -1292,7 +1295,7 @@ rfc7234_section_4_3_2_if_range_with_etag(Opts) ->
       ?_assertMatch({fresh, {_, {200, _, _}}},
                     F([{<<"if-range">>, <<"W/\"some-etag\"">>}], []))}].
 
-rfc7234_section_4_3_2_if_range_with_date(Opts) ->
+rfc9111_section_4_3_2_if_range_with_date(Opts) ->
     OneAndAHalfMinuteAgo = timestamp_to_rfc7231(unix_now() - 90),
     HalfMinuteAgo = timestamp_to_rfc7231(unix_now() - 30),
     Now = timestamp_to_rfc7231(unix_now()),
@@ -1322,7 +1325,7 @@ rfc7234_section_4_3_2_if_range_with_date(Opts) ->
                     F([{<<"if-range">>, Now}], [{<<"date">>, Now}]))},
      {spawn, ?_assertMatch({fresh, {_, {200, _, _}}}, F([{<<"if-range">>, Now}], []))}].
 
-rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag(Opts) ->
+rfc9111_section_4_3_4_cached_response_updated_with_strong_validator_etag(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1352,7 +1355,7 @@ rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag(Opts) -
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag_revalidation(Opts) ->
+rfc9111_section_4_3_4_cached_response_updated_with_strong_validator_etag_revalidation(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1385,7 +1388,7 @@ rfc7234_section_4_3_4_cached_response_updated_with_strong_validator_etag_revalid
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified(Opts) ->
+rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_last_modified(Opts) ->
     OneMinuteAgo = timestamp_to_rfc7231(unix_now() - 60),
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
@@ -1425,7 +1428,7 @@ rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified(
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified_revalidation(Opts) ->
+rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_last_modified_revalidation(Opts) ->
     OneMinuteAgo = timestamp_to_rfc7231(unix_now() - 60),
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
@@ -1471,7 +1474,7 @@ rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_last_modified_
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag(Opts) ->
+rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_etag(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1510,7 +1513,7 @@ rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag(Opts) ->
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidation(Opts) ->
+rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidation(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1555,7 +1558,7 @@ rfc7234_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidat
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_4_cached_response_updated_with_no_validator(Opts) ->
+rfc9111_section_4_3_4_cached_response_updated_with_no_validator(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun(RespHeaders) ->
            http_cache:cache(Req, {200, RespHeaders, <<"Some content">>}, Opts),
@@ -1582,7 +1585,7 @@ rfc7234_section_4_3_4_cached_response_updated_with_no_validator(Opts) ->
                            proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                        end)}].
 
-rfc7234_section_4_3_4_cached_response_updated_with_no_validator_revalidation(Opts) ->
+rfc9111_section_4_3_4_cached_response_updated_with_no_validator_revalidation(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun(RespHeaders) ->
            http_cache:cache(Req,
@@ -1617,7 +1620,7 @@ rfc7234_section_4_3_4_cached_response_updated_with_no_validator_revalidation(Opt
                            proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                        end)}].
 
-rfc7234_section_4_3_5_cached_response_updated_with_etag_matching(Opts) ->
+rfc9111_section_4_3_5_cached_response_updated_with_etag_matching(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1643,7 +1646,7 @@ rfc7234_section_4_3_5_cached_response_updated_with_etag_matching(Opts) ->
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_5_cached_response_updated_with_etag_matching_and_content_length(Opts) ->
+rfc9111_section_4_3_5_cached_response_updated_with_etag_matching_and_content_length(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1674,7 +1677,7 @@ rfc7234_section_4_3_5_cached_response_updated_with_etag_matching_and_content_len
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching(Opts) ->
+rfc9111_section_4_3_5_cached_response_updated_with_last_modified_matching(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     LastModified = timestamp_to_rfc7231(unix_now()),
     F = fun() ->
@@ -1701,7 +1704,7 @@ rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching(Opts) 
                         proplists:get_value(<<"age">>, RespHeaders, undefined)
                     end)}].
 
-rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching_and_content_length(Opts) ->
+rfc9111_section_4_3_5_cached_response_updated_with_last_modified_matching_and_content_length(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     LastModified = timestamp_to_rfc7231(unix_now()),
     F = fun() ->
@@ -1727,7 +1730,7 @@ rfc7234_section_4_3_5_cached_response_updated_with_last_modified_matching_and_co
                        proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                    end)}.
 
-rfc7234_section_4_3_5_cached_response_invalidated_no_validator(Opts) ->
+rfc9111_section_4_3_5_cached_response_invalidated_no_validator(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req, {200, [], <<"Some content">>}, Opts),
@@ -1743,7 +1746,7 @@ rfc7234_section_4_3_5_cached_response_invalidated_no_validator(Opts) ->
                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                       end)}.
 
-rfc7234_section_4_3_5_cached_response_invalidated_no_validator_get_resp(Opts) ->
+rfc9111_section_4_3_5_cached_response_invalidated_no_validator_get_resp(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req, {200, [], <<"Some content">>}, Opts),
@@ -1764,7 +1767,7 @@ rfc7234_section_4_3_5_cached_response_invalidated_no_validator_get_resp(Opts) ->
                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                       end)}.
 
-rfc7234_section_4_3_5_cached_response_invalidated_no_validator_head_resp(Opts) ->
+rfc9111_section_4_3_5_cached_response_invalidated_no_validator_head_resp(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1785,7 +1788,7 @@ rfc7234_section_4_3_5_cached_response_invalidated_no_validator_head_resp(Opts) -
                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                       end)}.
 
-rfc7234_section_4_3_5_cached_response_invalidated_content_length_mismatch(Opts) ->
+rfc9111_section_4_3_5_cached_response_invalidated_content_length_mismatch(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1810,7 +1813,7 @@ rfc7234_section_4_3_5_cached_response_invalidated_content_length_mismatch(Opts) 
                           proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                       end)}.
 
-rfc7234_section_4_3_5_ignore_when_status_code_is_not_200(Opts) ->
+rfc9111_section_4_3_5_ignore_when_status_code_is_not_200(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     F = fun() ->
            http_cache:cache(Req,
@@ -1831,7 +1834,7 @@ rfc7234_section_4_3_5_ignore_when_status_code_is_not_200(Opts) ->
                            proplists:get_value(<<"test-header">>, RespHeaders, undefined)
                        end)}].
 
-rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status(Opts) ->
+rfc9111_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status(Opts) ->
     URI = ?TEST_URL,
     OtherURI = <<"http://example.com/somewhere/else">>,
     [begin
@@ -1859,7 +1862,7 @@ rfc7234_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status(Opts) ->
         UnsafeMethod <- [<<"PUT">>, <<"POST">>, <<"PATCH">>, <<"DELETE">>, <<"UNKNOWN">>],
         SuccessStatus <- [Status || Status <- ?ALL_STATUSES, Status >= 200, Status < 400]].
 
-rfc7234_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status(Opts) ->
+rfc9111_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status(Opts) ->
     URI = ?TEST_URL,
     OtherURI = <<"http://example.com/somewhere/else">>,
     [begin
@@ -1882,7 +1885,7 @@ rfc7234_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status(Opts) ->
         UnsafeMethod <- [<<"PUT">>, <<"POST">>, <<"PATCH">>, <<"DELETE">>, <<"UNKNOWN">>],
         SuccessStatus <- [Status || Status <- ?ALL_STATUSES, Status > 400]].
 
-rfc7234_section_5_2_1_1_ccdir_max_age(Opts) ->
+rfc9111_section_5_2_1_1_ccdir_max_age(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -1911,7 +1914,7 @@ rfc7234_section_5_2_1_1_ccdir_max_age(Opts) ->
                                           Opts)
                        end)}].
 
-rfc7234_section_5_2_1_2_ccdir_max_stale(Opts) ->
+rfc9111_section_5_2_1_2_ccdir_max_stale(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -1940,7 +1943,7 @@ rfc7234_section_5_2_1_2_ccdir_max_stale(Opts) ->
                                           Opts)
                        end)}].
 
-rfc7234_section_5_2_1_3_ccdir_min_fresh(Opts) ->
+rfc9111_section_5_2_1_3_ccdir_min_fresh(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -1969,7 +1972,7 @@ rfc7234_section_5_2_1_3_ccdir_min_fresh(Opts) ->
                                           Opts)
                        end)}].
 
-rfc7234_section_5_2_1_4_ccdir_no_cache(Opts) ->
+rfc9111_section_5_2_1_4_ccdir_no_cache(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -1988,7 +1991,7 @@ rfc7234_section_5_2_1_4_ccdir_no_cache(Opts) ->
                                       Opts)
                    end)}.
 
-rfc7234_section_5_2_1_5_ccdir_no_store(Opts) ->
+rfc9111_section_5_2_1_5_ccdir_no_store(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"no-store">>}], <<"">>},
     Store =
         fun() ->
@@ -2003,7 +2006,7 @@ rfc7234_section_5_2_1_5_ccdir_no_store(Opts) ->
                        http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts)
                    end)}.
 
-rfc7234_section_5_2_1_7_ccdir_only_if_cached(Opts) ->
+rfc9111_section_5_2_1_7_ccdir_only_if_cached(Opts) ->
     F = fun(RespHeaders) ->
            http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, RespHeaders, <<"Some content">>},
@@ -2025,7 +2028,7 @@ rfc7234_section_5_2_1_7_ccdir_only_if_cached(Opts) ->
                                     <<"">>},
                                    Opts))}].
 
-rfc7234_section_5_2_2_1_ccdir_must_revalidate(Opts) ->
+rfc9111_section_5_2_2_2_ccdir_must_revalidate(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -2042,7 +2045,7 @@ rfc7234_section_5_2_2_1_ccdir_must_revalidate(Opts) ->
                        http_cache:get(Req, Opts)
                    end)}.
 
-rfc7234_section_5_2_2_2_ccdir_no_cache(Opts) ->
+rfc9111_section_5_2_2_4_ccdir_no_cache(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -2057,7 +2060,24 @@ rfc7234_section_5_2_2_2_ccdir_no_cache(Opts) ->
                        http_cache:get(Req, Opts)
                    end)}.
 
-rfc7234_section_5_2_2_3_ccdir_no_store(Opts) ->
+rfc9111_section_5_2_2_4_ccdir_no_cache_qualified_ignored(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    Store =
+        fun() ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"cache-control">>, <<"no-cache=\"some-header\"">>}],
+                             <<"Some content">>},
+                            Opts)
+        end,
+    {spawn,
+     ?_assertMatch({must_revalidate, _},
+                   begin
+                       Store(),
+                       http_cache:get(Req, Opts)
+                   end)}.
+
+rfc9111_section_5_2_2_5_ccdir_no_store(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -2072,7 +2092,7 @@ rfc7234_section_5_2_2_3_ccdir_no_store(Opts) ->
                        http_cache:get(Req, Opts)
                    end)}.
 
-rfc7234_section_5_2_2_4_ccdir_no_transform_auto_compress(Opts) ->
+rfc9111_section_5_2_2_6_ccdir_no_transform_auto_compress(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Resp =
         {200,
@@ -2090,7 +2110,7 @@ rfc7234_section_5_2_2_4_ccdir_no_transform_auto_compress(Opts) ->
                                        set_opt(auto_decompress, true, Opts))
                     end)}].
 
-rfc7234_section_5_2_2_4_ccdir_no_transform_auto_decompress(Opts) ->
+rfc9111_section_5_2_2_6_ccdir_no_transform_auto_decompress(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Resp =
         {200,
@@ -2117,7 +2137,7 @@ rfc7234_section_5_2_2_4_ccdir_no_transform_auto_decompress(Opts) ->
                                        set_opt(auto_decompress, true, Opts))
                     end)}].
 
-rfc7234_section_5_2_2_4_ccdir_no_transform_range(Opts) ->
+rfc9111_section_5_2_2_6_ccdir_no_transform_range(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Resp = {200, [{<<"cache-control">>, <<"no-transform">>}], <<"Some content">>},
     Store = fun() -> http_cache:cache(Req, Resp, Opts) end,
@@ -2132,7 +2152,7 @@ rfc7234_section_5_2_2_4_ccdir_no_transform_range(Opts) ->
                                       Opts)
                    end)}.
 
-rfc7234_section_5_2_2_5_ccdir_public(Opts) ->
+rfc9111_section_5_2_2_9_ccdir_public(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -2147,7 +2167,7 @@ rfc7234_section_5_2_2_5_ccdir_public(Opts) ->
                        http_cache:get(Req, Opts)
                    end)}.
 
-rfc7234_section_5_2_2_6_ccdir_private(Opts) ->
+rfc9111_section_5_2_2_7_ccdir_private(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     PrivOpts = set_opt(type, private, Opts),
     Store =
@@ -2169,7 +2189,31 @@ rfc7234_section_5_2_2_6_ccdir_private(Opts) ->
                         http_cache:get(Req, PrivOpts)
                     end)}].
 
-rfc7234_section_5_2_2_7_ccdir_proxy_revalidate(Opts) ->
+rfc9111_section_5_2_2_7_ccdir_private_qualified_ignored(Opts) ->
+    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
+    PrivOpts = set_opt(type, private, Opts),
+    Store =
+        fun(SelectedOpts) ->
+           http_cache:cache(Req,
+                            {200,
+                             [{<<"cache-control">>, <<"private=\"some-header\"">>}],
+                             <<"Some content">>},
+                            SelectedOpts)
+        end,
+    [{spawn,
+      ?_assertMatch(miss,
+                    begin
+                        Store(Opts),
+                        http_cache:get(Req, Opts)
+                    end)},
+     {spawn,
+      ?_assertMatch({fresh, _},
+                    begin
+                        Store(PrivOpts),
+                        http_cache:get(Req, PrivOpts)
+                    end)}].
+
+rfc9111_section_5_2_2_8_ccdir_proxy_revalidate(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"max-stale=5">>}], <<"">>},
     PrivOpts = set_opt(type, private, Opts),
     Store =
@@ -2193,7 +2237,7 @@ rfc7234_section_5_2_2_7_ccdir_proxy_revalidate(Opts) ->
                         http_cache:get(Req, PrivOpts)
                     end)}].
 
-rfc7234_section_5_2_2_8_ccdir_max_age(Opts) ->
+rfc9111_section_5_2_2_1_ccdir_max_age(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun(MaxAge) ->
@@ -2216,7 +2260,7 @@ rfc7234_section_5_2_2_8_ccdir_max_age(Opts) ->
                            http_cache:get(Req, Opts)
                        end)}].
 
-rfc7234_section_5_2_2_9_ccdir_s_maxage(Opts) ->
+rfc9111_section_5_2_2_10_ccdir_s_maxage(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     PrivOpts = set_opt(type, private, Opts),
     Store =
@@ -2252,7 +2296,7 @@ rfc7234_section_5_2_2_9_ccdir_s_maxage(Opts) ->
                         http_cache:get(Req, PrivOpts)
                     end)}].
 
-rfc7234_section_5_3_header_expires_malformed(Opts) ->
+rfc9111_section_5_3_header_expires_malformed(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun() ->
@@ -2269,7 +2313,7 @@ rfc7234_section_5_3_header_expires_malformed(Opts) ->
                           http_cache:get(Req, Opts)
                       end)}.
 
-rfc7234_section_5_3_header_expires(Opts) ->
+rfc9111_section_5_3_header_expires(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     NowRFC7231 = timestamp_to_rfc7231(unix_now()),
     SoonRFC7231 = timestamp_to_rfc7231(unix_now() + 10),
@@ -2302,7 +2346,7 @@ rfc7234_section_5_3_header_expires(Opts) ->
                         http_cache:get(Req, Opts)
                     end)}].
 
-rfc7234_section_5_4_header_pragma(Opts) ->
+rfc9111_section_5_4_header_pragma(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun(Headers) -> http_cache:cache(Req, {200, Headers, <<"Some content">>}, Opts) end,

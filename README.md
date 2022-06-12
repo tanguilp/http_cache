@@ -72,11 +72,13 @@ dependency if you need to use it.
 
 ## Conformance
 
-RFC7234: [Hypertext Transfer Protocol (HTTP/1.1): Caching](https://datatracker.ietf.org/doc/html/rfc7234):
+RFC9111: [HTTP Caching](https://www.rfc-editor.org/rfc/rfc9111.html):
 - [-] 3. Storing Responses in Caches
-  - [ ] 3.1. Storing Incomplete Responses
-  - [x] 3.2. Storing Responses to Authenticated Requests
-  - [ ] 3.3. Combining Partial Content
+  - [ ] 3.1. Storing Header and Trailer Fields
+  - [x] 3.2. Updating Stored Header Fields
+  - [ ] 3.3. Storing Incomplete Responses
+  - [ ] 3.4. Combining Partial Content
+  - [x] 3.5. Storing Responses to Authenticated Requests
 - [x] 4. Constructing Responses from Caches
   - [x] 4.1. Calculating Secondary Keys with Vary
   - [x] 4.2. Freshness
@@ -90,22 +92,35 @@ RFC7234: [Hypertext Transfer Protocol (HTTP/1.1): Caching](https://datatracker.i
     - [x] 4.3.3. Handling a Validation Response
     - [x] 4.3.4. Freshening Stored Responses upon Validation
     - [x] 4.3.5. Freshening Responses via HEAD
-  - [x] 4.4. Invalidation
+  - [x] 4.4. Invalidating Stored Responses
 - [-] 5. Header Field Definitions
   - [x] 5.1. Age
   - [x] 5.2. Cache-Control
     - [x] 5.2.1. Request Cache-Control Directives
-    - [x] 5.2.2. Response Cache-Control Directives
+      - [x] 5.2.1.1. `max-age`
+      - [x] 5.2.1.2. `max-stale`
+      - [x] 5.2.1.3. `min-fresh`
+      - [x] 5.2.1.4. `no-cache`
+      - [x] 5.2.1.5. `no-store`
+      - [x] 5.2.1.6. `no-transform`
+      - [x] 5.2.1.7. `only-if-cached`
+    - [-] 5.2.2. Response Cache-Control Directives
+      - [x] 5.2.2.1. `max-age`
+      - [x] 5.2.2.2. `must-revalidate`
+      - [x] 5.2.2.3. `must-understand`: `http_cache` only caches responses that have a known status
+      code
+      - [-] 5.2.2.4. `no-cache`: only unqualified form is supported
+      - [x] 5.2.2.5. `no-store`
+      - [x] 5.2.2.6. `no-transform`
+      - [-] 5.2.2.7. `private`" only unqualified form is supported
+      - [x] 5.2.2.8. `proxy-revalidate`
+      - [x] 5.2.2.9. `public`
+      - [x] 5.2.2.10. `s-maxage`
     - [-] 5.2.3. Cache Control Extensions
+    - [-] 5.2.4. Cache Directive Registry
   - [x] 5.3. Expires
   - [x] 5.4. Pragma
-  - [-] 5.5. Warning
-    - [x] 5.5.1. Warning: 110 - "Response is Stale"
-    - [x] 5.5.2. Warning: 111 - "Revalidation Failed"
-    - [ ] 5.5.3. Warning: 112 - "Disconnected Operation"
-    - [x] 5.5.4. Warning: 113 - "Heuristic Expiration"
-    - [x] 5.5.5. Warning: 199 - "Miscellaneous Warning"
-    - [x] 5.5.6. Warning: 214 - "Transformation Applied"
+  - [ ] 5.5. Warning
 
 RFC5861: [HTTP Cache-Control Extensions for Stale Content](https://datatracker.ietf.org/doc/html/rfc5861)
 - [x] 3. The stale-while-revalidate Cache-Control Extension

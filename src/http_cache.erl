@@ -558,7 +558,7 @@ notify_response_used(RespRef, Opts) ->
 %% This function shall be called with any response, even those known to be not
 %% cacheable, such as `DELETE' requests, because such non-cacheable request
 %% can still have side effects on other cached objects
-%% (see [https://datatracker.ietf.org/doc/html/rfc7234#section-4.4]).
+%% (see [https://www.rfc-editor.org/rfc/rfc9111.html#name-invalidating-stored-respons]).
 %% In this example, a successful `DELETE' request triggers the
 %% invalidation of cached results of the deleted object with the same URL.
 %%
@@ -1126,7 +1126,7 @@ normalize_opts(Opts) ->
 
 % Invalidating POST requests is a grey zone: POST requests can be cached when there is
 % explicit cache information (RFC7231 section 4.3.3) but POST requests are unsafe and must also
-% trigger invalidation of the response for the URI (RFC7234 4.4).
+% trigger invalidation of the response for the URI (RFC9111 4.4).
 % So we invalidate URI of POST requests only when the reponse is not cacheable
 must_invalidate_request_uri({<<"GET">>, _, _, _}, _Response, _) ->
     false;

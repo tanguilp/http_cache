@@ -15,7 +15,7 @@
 
 -module(http_cache_store).
 
--export_type([request_key/0, candidate/0, response/0, response_ref/0, url_digest/0]).
+-export_type([request_key/0, candidate/0, response/0, response_ref/0, url_digest/0, opts/0]).
 
 -type url_digest() :: binary().
 %% Opaque URL digest as computed by the main module
