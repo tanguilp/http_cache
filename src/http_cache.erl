@@ -318,8 +318,7 @@
           <<"cache-control">> => [],
           <<"content-encoding">> => [],
           <<"if-none-match">> => [],
-          <<"vary">> => [],
-          <<"warning">> => []}).
+          <<"vary">> => []}).
 -define(KV_HEADERS, #{<<"accept-encoding">> => [], <<"cache-control">> => []}).
 -define(DEFAULT_OPTS,
         #{allow_stale_while_revalidate => false,
@@ -507,7 +506,7 @@ postprocess_response(Freshness,
         Response1 ->
             Response2 =
                 transform_response(Request, ParsedReqHeaders, Response1, RespMetadata, Opts),
-            Response3 = set_cached_resp_headers(Response2, RespMetadata),
+            Response3 = set_age_header(Response2, RespMetadata),
             Response4 = handle_file_body(Response3),
             {Freshness, {RespRef, Response4}}
     end.
@@ -687,7 +686,7 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
              ParsedReqHeaders,
              {Status, RespHeaders, GzippedBody},
              ParsedRespHeaders,
-             maps:put(compressed_by_this_lib, true, Opts));
+             Opts);
 do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
          ParsedReqHeaders,
          {Status, RespHeaders0, RespBody0},
@@ -723,8 +722,7 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
                          <<"last-modified">>,
                          <<"pragma">>],
                         ParsedRespHeaders),
-          alternate_keys => map_get(alternate_keys, Opts),
-          compressed_by_this_lib => maps:get(compressed_by_this_lib, Opts, false)},
+          alternate_keys => map_get(alternate_keys, Opts)},
     telemetry_stop_measurement(analysis_time),
     telemetry_start_measurement(store_save_time),
     StoreRes = Store:put(RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata),
@@ -1028,46 +1026,11 @@ resp_proxy_must_revalidate(#{<<"cache-control">> := #{<<"proxy-revalidate">> := 
 resp_proxy_must_revalidate(_, _) ->
     false.
 
-set_cached_resp_headers({Status, RespHeaders0, RespBody}, RespMetadata) ->
-    RespHeaders1 = set_age_header(RespHeaders0, RespMetadata),
-    RespHeaders2 = set_warning_response_stale(RespHeaders1, RespMetadata),
-    RespHeaders3 = set_warning_response_heuristic_expiration(RespHeaders2, RespMetadata),
-    RespHeaders4 = set_warning_transformation_applied(RespHeaders3, RespMetadata, RespBody),
-    {Status, RespHeaders4, RespBody}.
-
-set_age_header(RespHeaders0, #{created := Created}) ->
+set_age_header({Status, RespHeaders0, RespBody}, #{created := Created}) ->
     AgeBin = list_to_binary(integer_to_list(unix_now() - Created)),
     RespHeaders1 = delete_header(<<"age">>, RespHeaders0),
-    set_header_value(<<"age">>, AgeBin, RespHeaders1).
-
-set_warning_response_stale(RespHeaders, #{expires := Expires}) ->
-    case unix_now() >= Expires of
-        true ->
-            set_header_value(<<"warning">>, <<"110 - \"response is Stale\"">>, RespHeaders);
-        false ->
-            RespHeaders
-    end.
-
-set_warning_response_heuristic_expiration(RespHeaders,
-                                          #{created := CreatedAt, ttl_set_by := heuristics}) ->
-    case unix_now() - CreatedAt > 24 * 60 * 60 of
-        true ->
-            set_header_value(<<"warning">>, <<"113 - \"heuristic expiration\"">>, RespHeaders);
-        false ->
-            RespHeaders
-    end;
-set_warning_response_heuristic_expiration(RespHeaders, _RespMetadata) ->
-    RespHeaders.
-
-% Here we only handle the case when we return a gziped by this lib response
-% The case when returning a ungziped response from a gzipped response from
-% the origin cannot be handled here
-set_warning_transformation_applied(RespHeaders,
-                                   #{compressed_by_this_lib := true},
-                                   <<?GZIP_MAGIC_BYTES, _/binary>>) ->
-    set_header_value(<<"warning">>, <<"214 - \"Transformation Applied\"">>, RespHeaders);
-set_warning_transformation_applied(RespHeaders, _RespMetadata, _RespBody) ->
-    RespHeaders.
+    RespHeaders2 = set_header_value(<<"age">>, AgeBin, RespHeaders1),
+    {Status, RespHeaders2, RespBody}.
 
 handle_file_body({_Status, _RespHeaders, {sendfile, _, _, _}} = Response) ->
     Response;
@@ -1325,8 +1288,7 @@ cache_type(#{type := Type}) ->
 handle_auto_decompress(ParsedReqHeaders,
                        {Status, RespHeaders0, BodyOrFile} = Response,
                        #{parsed_headers :=
-                             #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders,
-                         compressed_by_this_lib := CompressedByThisLib},
+                             #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders},
                        #{auto_decompress := true})
     when is_list(ContentEncodings) andalso not ?has_strong_etag(ParsedRespHeaders) ->
     ContentEncoding = lists:last(ContentEncodings),
@@ -1357,16 +1319,7 @@ handle_auto_decompress(ParsedReqHeaders,
                         set_header_value(<<"content-encoding">>, ContentEncodingsBin, RespHeaders1)
                 end,
             RespHeaders3 = set_header_value(<<"content-length">>, ContentLengthBin, RespHeaders2),
-            RespHeaders4 =
-                case CompressedByThisLib of
-                    true ->
-                        RespHeaders3;
-                    false ->
-                        set_header_value(<<"warning">>,
-                                         <<"214 - \"Transformation Applied\"">>,
-                                         RespHeaders3)
-                end,
-            {Status, RespHeaders4, DecompressedBody}
+            {Status, RespHeaders3, DecompressedBody}
     end;
 handle_auto_decompress(_ParsedReqHeaders, Response, _RespMetadata, _Opts) ->
     Response.

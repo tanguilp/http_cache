@@ -93,11 +93,6 @@ http_cache_test_() ->
       fun rfc7234_section_5_2_2_8_ccdir_max_age/1, fun rfc7234_section_5_2_2_9_ccdir_s_maxage/1,
       fun rfc7234_section_5_3_header_expires_malformed/1,
       fun rfc7234_section_5_3_header_expires/1, fun rfc7234_section_5_4_header_pragma/1,
-      fun rfc7234_section_5_5_1_response_is_stale/1,
-      %fun rfc7234_section_5_5_2_warning_revalidation_failed/1,
-      fun rfc7234_section_5_5_4_warning_heuristics_expiration/1,
-      fun rfc7234_section_5_5_6_plain_compressed/1,
-      fun rfc7234_section_5_5_6_already_compressed/1,
       fun rfc5861_stale_while_revalidate_not_expired/1,
       fun rfc5861_stale_while_revalidate_expired/1,
       fun rfc5861_stale_if_error_req_not_expired/1, fun rfc5861_stale_if_error_req_expired/1,
@@ -2331,75 +2326,6 @@ rfc7234_section_5_4_header_pragma(Opts) ->
                                   {<<"cache-control">>, <<"&%^%!^@(^^">>}]),
                            http_cache:get(Req, Opts)
                        end)}].
-
-rfc7234_section_5_5_1_response_is_stale(Opts) ->
-    F = fun() ->
-           Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"max-stale=10">>}], <<"">>},
-           http_cache:cache(Req,
-                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
-                            Opts),
-           {stale, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, Opts),
-           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
-        end,
-    {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"110">>))}.
-
-%rfc7234_section_5_5_2_warning_revalidation_failed(Opts) ->
-%    F = fun() ->
-%           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-%           http_cache:cache(Req,
-%                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
-%                            Opts),
-%           {stale, {_, {_, RespHeaders, _}}} =
-%               http_cache:get(Req, [{origin_unreachable, true} | Opts]),
-%           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
-%        end,
-%    {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"111">>))}.
-
-rfc7234_section_5_5_4_warning_heuristics_expiration(Opts) ->
-    F = fun() ->
-           TwoDays = 60 * 60 * 24 * 2,
-           FourDays = 2 * TwoDays,
-           TestOpts =
-               [{default_ttl, FourDays}, {request_time, unix_now() - TwoDays}]
-               ++ proplists:delete(default_ttl, Opts),
-           Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-           http_cache:cache(Req, {200, [{<<"age">>, <<"0">>}], <<"Some content">>}, TestOpts),
-           {fresh, {_RespRef, {_, RespHeaders, _}}} = http_cache:get(Req, TestOpts),
-           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
-        end,
-    {spawn, ?_assertMatch({_, _}, binary:match(F(), <<"113">>))}.
-
-rfc7234_section_5_5_6_plain_compressed(Opts) ->
-    F = fun(ReqHeaders) ->
-           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
-                            {200, [{<<"content-type">>, <<"text/plain">>}], <<"Some content">>},
-                            set_opt(auto_compress, true, Opts)),
-           {fresh, {_, {200, RespHeaders, _}}} =
-               http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
-                              set_opt(auto_decompress, true, Opts)),
-           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
-        end,
-    [{spawn,
-      ?_assertMatch({_, _}, binary:match(F([{<<"accept-encoding">>, <<"gzip">>}]), <<"214">>))},
-     {spawn, ?_assertMatch(nomatch, binary:match(F([]), <<"214">>))}].
-
-rfc7234_section_5_5_6_already_compressed(Opts) ->
-    F = fun(ReqHeaders) ->
-           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
-                            {200,
-                             [{<<"content-encoding">>, <<"gzip">>},
-                              {<<"vary">>, <<"content-encoding">>}],
-                             zlib:gzip(<<"Some content">>)},
-                            Opts),
-           {fresh, {_, {200, RespHeaders, _}}} =
-               http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
-                              set_opt(auto_decompress, true, Opts)),
-           proplists:get_value(<<"warning">>, RespHeaders, <<"">>)
-        end,
-    [{spawn,
-      ?_assertMatch(nomatch,
-                    binary:match(F([{<<"accept-encoding">>, <<"gzip">>}]), <<"214">>))},
-     {spawn, ?_assertMatch({_, _}, binary:match(F([]), <<"214">>))}].
 
 rfc5861_stale_while_revalidate_not_expired(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},

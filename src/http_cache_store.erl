@@ -31,8 +31,7 @@
       grace := http_cache:timestamp(),
       ttl_set_by := header | heuristics,
       parsed_headers := #{binary() => term()},
-      alternate_keys := [http_cache:alternate_key()],
-      compressed_by_this_lib := boolean()}.
+      alternate_keys := [http_cache:alternate_key()]}.
 -type body() :: binary().
 % The body transmitted to the backend is a binary so as to optimize copying around
 % data: an IOlist would have to be copied whereas (big) binaries are simply
@@ -64,8 +63,9 @@
               RespMetadata :: response_metadata()) ->
                  ok | {error, term()}.
 %% Saves a response and associated metadata
--callback notify_response_used(RespRef :: response_ref(), Time :: http_cache:timestamp()) ->
-                              ok | {error, term()}.
+-callback notify_response_used(RespRef :: response_ref(),
+                               Time :: http_cache:timestamp()) ->
+                                  ok | {error, term()}.
 %% Notify that a response was used. A LRU cache, for instance, would update the timestamp
 %% the response was last used
 -callback invalidate_url(UrlDigest :: url_digest()) -> http_cache:invalidation_result().
