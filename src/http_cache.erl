@@ -75,7 +75,18 @@
 %%%
 %%%     Metadata:
 %%%     <ul>
-%%%       <li>`type': `url' or `alternate_key'</li>
+%%%       <li>`type': `invalidate_by_url' or `invalidate_by_alternate_key'</li>
+%%%     </ul>
+%%%   </li>
+%%%   <li>
+%%%     `[http_cache, store, error]' informs about errors of the store.
+%%%
+%%%     Measurements: none
+%%%
+%%%     Metadata:
+%%%     <ul>
+%%%       <li>`type': `cache', `invalidate_by_url` or `invalidate_by_alternate_key'</li>
+%%%       <li>`reason': an erlang term that gives the error reason</li>
 %%%     </ul>
 %%%   </li>
 %%%   <li>
@@ -354,6 +365,7 @@
 -define(TELEMETRY_INVALIDATION_EVT, [http_cache, invalidation]).
 -define(TELEMETRY_COMPRESS_EVT, [http_cache, compress_operation]).
 -define(TELEMETRY_DECOMPRESS_EVT, [http_cache, decompress_operation]).
+-define(TELEMETRY_STORE_ERROR_EVT, [http_cache, store, error]).
 -define(TELEMETRY_PROCESS_TAG, {?MODULE, telemetry_data}).
 -define(is_no_transform(Headers),
         (is_map_key(<<"cache-control">>, Headers)
@@ -700,7 +712,7 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
              {Status, RespHeaders, GzippedBody},
              ParsedRespHeaders,
              Opts);
-do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
+do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
          ParsedReqHeaders,
          {Status, RespHeaders0, RespBody0},
          ParsedRespHeaders,
@@ -742,23 +754,7 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
     StoreRes =
         Store:put(RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata, StoreOpts),
     telemetry_stop_measurement(store_save_time),
-    case StoreRes of
-        ok ->
-            ok;
-        {error, Reason} ->
-            logger:log(notice,
-                       #{what => store_response,
-                         in => ?MODULE,
-                         result => error,
-                         details =>
-                             #{error_reason => Reason,
-                               request =>
-                                   #{method => Method,
-                                     url => Url,
-                                     headers => ReqHeaders0},
-                               response => #{status => Status, headers => RespHeaders0}},
-                         text => 'http_cache failed to store a response'})
-    end,
+    telemetry_log_cache_store_result(StoreRes),
     TransformedResponse =
         transform_response(Request, ParsedReqHeaders, Response, RespMetadata, Opts),
     {ok, TransformedResponse}.
@@ -775,7 +771,7 @@ do_invalidate_url(Url, #{store := Store, store_opts := StoreOpts} = Opts) ->
     UrlDigest = url_digest(Url, Opts),
     {InvalidationDur, InvalidationRes} =
         timer:tc(Store, invalidate_url, [UrlDigest, StoreOpts]),
-    log_invalidation_result(InvalidationRes, url, InvalidationDur).
+    telemetry_log_invalidation_result(InvalidationRes, invalidate_by_url, InvalidationDur).
 
 %%------------------------------------------------------------------------------
 %% @doc Invalidates all responses stored with the alternate key
@@ -792,7 +788,9 @@ do_invalidate_by_alternate_key([_ | _] = AltKeys,
                                #{store := Store, store_opts := StoreOpts}) ->
     {InvalidationDur, InvalidationRes} =
         timer:tc(Store, invalidate_by_alternate_key, [AltKeys, StoreOpts]),
-    log_invalidation_result(InvalidationRes, alternate_key, InvalidationDur);
+    telemetry_log_invalidation_result(InvalidationRes,
+                                      invalidate_by_alternate_key,
+                                      InvalidationDur);
 do_invalidate_by_alternate_key(AltKey, #{store := _} = Opts) ->
     do_invalidate_by_alternate_key([AltKey], Opts).
 
@@ -1883,19 +1881,27 @@ get_body_content({file, FilePath}) ->
 get_body_content(<<_/binary>> = BinBody) ->
     BinBody.
 
-log_invalidation_result({ok, NbInvalidation}, Type, InvalidationDur)
+telemetry_log_invalidation_result({ok, NbInvalidation}, Type, InvalidationDur)
     when is_integer(NbInvalidation) ->
     telemetry:execute(?TELEMETRY_INVALIDATION_EVT,
                       #{count => NbInvalidation, duration => InvalidationDur},
                       #{type => Type}),
     {ok, NbInvalidation};
-log_invalidation_result({ok, undefined}, Type, InvalidationDur) ->
+telemetry_log_invalidation_result({ok, undefined}, Type, InvalidationDur) ->
     telemetry:execute(?TELEMETRY_INVALIDATION_EVT,
                       #{duration => InvalidationDur},
                       #{type => Type}),
     {ok, undefined};
-log_invalidation_result(Error, _Type, _InvlidationDur) ->
-    Error.
+telemetry_log_invalidation_result({error, Reason}, Type, _InvlidationDur) ->
+    telemetry_log_error(Reason, Type).
+
+telemetry_log_cache_store_result({error, Reason}) ->
+    telemetry_log_error(Reason, cache);
+telemetry_log_cache_store_result(_) ->
+    ok.
+
+telemetry_log_error(Reason, Type) ->
+    telemetry:execute(?TELEMETRY_STORE_ERROR_EVT, #{}, #{type => Type, reason => Reason}).
 
 unix_now() ->
     os:system_time(second).
