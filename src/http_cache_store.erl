@@ -51,26 +51,32 @@
      RespHeaders :: http_cache:headers(),
      VaryHeaders :: vary_headers(),
      RespMetadata :: response_metadata()}.
+-type opts() :: any().
 
--callback list_candidates(RequestKey :: request_key()) -> [candidate()].
+-callback list_candidates(RequestKey :: request_key(), Opts :: opts()) -> [candidate()].
 %% Returns the list of candidates matching a request, via its request key
--callback get_response(RespRef :: response_ref()) -> response() | undefined.
+-callback get_response(RespRef :: response_ref(), Opts :: opts()) ->
+                          response() | undefined.
 %% Returns a response from a response reference returned by `list_candidates/1'
 -callback put(RequestKey :: request_key(),
               UrlDigest :: url_digest(),
               VaryHeaders :: vary_headers(),
               Response :: http_cache:response(),
-              RespMetadata :: response_metadata()) ->
+              RespMetadata :: response_metadata(),
+              Opts :: opts()) ->
                  ok | {error, term()}.
 %% Saves a response and associated metadata
--callback notify_response_used(RespRef :: response_ref()) -> ok | {error, term()}.
+-callback notify_response_used(RespRef :: response_ref(), Opts :: opts()) ->
+                                  ok | {error, term()}.
 %% Notify that a response was used. A LRU cache, for instance, would update the timestamp
 %% the response was last used
--callback invalidate_url(UrlDigest :: url_digest()) -> http_cache:invalidation_result().
+-callback invalidate_url(UrlDigest :: url_digest(), Opts :: opts()) ->
+                            http_cache:invalidation_result().
 %% Invalidates all responses for a given URL digest
--callback invalidate_by_alternate_key([AltKeys :: http_cache:alternate_key()]) ->
+-callback invalidate_by_alternate_key([AltKeys :: http_cache:alternate_key()],
+                                      Opts :: opts()) ->
                                          http_cache:invalidation_result().
 
 %% Invalidates all responses that has been tag with one of the alternate keys
 
--optional_callbacks([invalidate_by_alternate_key/1]).
+-optional_callbacks([invalidate_by_alternate_key/2]).

@@ -255,6 +255,10 @@
 %%    Used by all functions, no defaults.
 %%  </li>
 %%  <li>
+%%    `store_opts': the store backend's options.
+%%    Used by all functions, defaults to `[]'.
+%%  </li>
+%%  <li>
 %%    `type': <b>required</b>, cache type. `shared' or `private'. A CDN is an example of a shared cache. A browser cache
 %%    is an example of a private cache.
 %%    Used by {@link get/2}, {@link cache/3} and {@link cache/4}. Defaults to `shared'.
@@ -281,6 +285,7 @@
     {ignore_query_params_order, boolean()} |
     {max_ranges, non_neg_integer()} |
     {store, module()} |
+    {store_opts, http_cache_store:opts()} |
     {type, type()} |
     {request_time, non_neg_integer()}.
 -type invalidation_result() ::
@@ -334,6 +339,7 @@
           default_grace => ?DEFAULT_GRACE,
           ignore_query_params_order => false,
           max_ranges => 100,
+          store_opts => [],
           type => shared}).
 -define(GZIP_MAGIC_BYTES, 31, 139).
 -define(PDICT_MEASUREMENTS, http_cache_measurments).
@@ -428,10 +434,11 @@ get(Request, Opts) ->
             end
     end.
 
-do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts) ->
+do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request,
+       #{store := Store, store_opts := StoreOpts} = Opts) ->
     RequestKey = request_key(Request, Opts),
     telemetry_start_measurement(store_lookup_time),
-    Candidates = Store:list_candidates(RequestKey),
+    Candidates = Store:list_candidates(RequestKey, StoreOpts),
     telemetry_stop_measurement(store_lookup_time),
     telemetry_set_measurement(candidate_count, length(Candidates)),
     ParsedReqHeaders =
@@ -451,7 +458,7 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request, #{store := Store} = Opts
         {Freshness, {RespRef, _Status, _RespHeaders, _VaryHeaders, _RespMetadata}} ->
             telemetry_set_metadata(freshness, Freshness),
             telemetry_start_measurement(store_get_response_time),
-            MaybeResponse = Store:get_response(RespRef),
+            MaybeResponse = Store:get_response(RespRef, StoreOpts),
             telemetry_stop_measurement(store_get_response_time),
             case MaybeResponse of
                 {Status, RespHeaders, RespBody, RespMetadata} ->
@@ -531,8 +538,8 @@ transform_response(Request, ParsedReqHeaders, Response0, RespMetadata, Opts) ->
 -spec notify_response_used(http_cache_store:response_ref(), opts()) ->
                               ok | {error, term()}.
 notify_response_used(RespRef, Opts) ->
-    #{store := Store} = normalize_opts(Opts),
-    Store:notify_response_used(RespRef).
+    #{store := Store, store_opts := StoreOpts} = normalize_opts(Opts),
+    Store:notify_response_used(RespRef, StoreOpts).
 
 %%------------------------------------------------------------------------------
 %% @doc Caches a response
@@ -691,7 +698,7 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
          ParsedReqHeaders,
          {Status, RespHeaders0, RespBody0},
          ParsedRespHeaders,
-         #{store := Store} = Opts) ->
+         #{store := Store, store_opts := StoreOpts} = Opts) ->
     RespBodyBin = iolist_to_binary(RespBody0),
     % the response doesn't necessarily has the content length set, but we have this
     % information, so let's be a good citizen of the web and always set it
@@ -725,7 +732,8 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
           alternate_keys => map_get(alternate_keys, Opts)},
     telemetry_stop_measurement(analysis_time),
     telemetry_start_measurement(store_save_time),
-    StoreRes = Store:put(RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata),
+    StoreRes =
+        Store:put(RequestKey, UrlDigest, VaryHeaders, Response, RespMetadata, StoreOpts),
     telemetry_stop_measurement(store_save_time),
     case StoreRes of
         ok ->
@@ -756,9 +764,10 @@ do_cache({Method, Url, ReqHeaders0, _ReqBody} = Request,
 invalidate_url(Url, Opts) ->
     do_invalidate_url(Url, normalize_opts(Opts)).
 
-do_invalidate_url(Url, #{store := Store} = Opts) ->
+do_invalidate_url(Url, #{store := Store, store_opts := StoreOpts} = Opts) ->
     UrlDigest = url_digest(Url, Opts),
-    {InvalidationDur, InvalidationRes} = timer:tc(Store, invalidate_url, [UrlDigest]),
+    {InvalidationDur, InvalidationRes} =
+        timer:tc(Store, invalidate_url, [UrlDigest, StoreOpts]),
     log_invalidation_result(InvalidationRes, url, InvalidationDur).
 
 %%------------------------------------------------------------------------------
@@ -772,9 +781,10 @@ invalidate_by_alternate_key(AltKeys, Opts) ->
 
 do_invalidate_by_alternate_key([], _Opts) ->
     {ok, 0};
-do_invalidate_by_alternate_key([_ | _] = AltKeys, #{store := Store}) ->
+do_invalidate_by_alternate_key([_ | _] = AltKeys,
+                               #{store := Store, store_opts := StoreOpts}) ->
     {InvalidationDur, InvalidationRes} =
-        timer:tc(Store, invalidate_by_alternate_key, [AltKeys]),
+        timer:tc(Store, invalidate_by_alternate_key, [AltKeys, StoreOpts]),
     log_invalidation_result(InvalidationRes, alternate_key, InvalidationDur);
 do_invalidate_by_alternate_key(AltKey, #{store := _} = Opts) ->
     do_invalidate_by_alternate_key([AltKey], Opts).
@@ -1140,16 +1150,18 @@ must_invalidate_request_uri(_Request, {Status, _, _}, _)
 must_invalidate_request_uri(_Request, _Response, _) ->
     false.
 
-handle_invalidation_of_unsafe_method({_, Url, _, _}, [], #{store := Store} = Opts) ->
-    Store:invalidate_url(url_digest(Url, Opts));
+handle_invalidation_of_unsafe_method({_, Url, _, _},
+                                     [],
+                                     #{store := Store, store_opts := StoreOpts} = Opts) ->
+    Store:invalidate_url(url_digest(Url, Opts), StoreOpts);
 handle_invalidation_of_unsafe_method(Request,
                                      [{HeaderName, HeaderValue} | RestHeaders],
-                                     #{store := Store} = Opts) ->
+                                     #{store := Store, store_opts := StoreOpts} = Opts) ->
     case ?LOWER(HeaderName) of
         <<"location">> ->
-            Store:invalidate_url(url_digest(HeaderValue, Opts));
+            Store:invalidate_url(url_digest(HeaderValue, Opts), StoreOpts);
         <<"content-location">> ->
-            Store:invalidate_url(url_digest(HeaderValue, Opts));
+            Store:invalidate_url(url_digest(HeaderValue, Opts), StoreOpts);
         _ ->
             ok
     end,
@@ -1561,17 +1573,19 @@ handle_failed_condition({Method, _Url, _ReqHeaders, _ReqBody},
 handle_failed_condition(_Request, _Response) ->
     {412, [], <<>>}.
 
-refresh_stored_responses(Request, {304, RespHeaders, _}, #{store := Store} = Opts) ->
+refresh_stored_responses(Request,
+                         {304, RespHeaders, _},
+                         #{store := Store, store_opts := StoreOpts} = Opts) ->
     RequestKey = request_key(Request, Opts),
-    Candidates = Store:list_candidates(RequestKey),
+    Candidates = Store:list_candidates(RequestKey, StoreOpts),
     ParsedRespHeaders = parse_headers(RespHeaders, [<<"etag">>, <<"last-modified">>]),
     CandidatesToUpdate = select_candidates_to_update(Candidates, ParsedRespHeaders),
     update_candidates(CandidatesToUpdate, Request, RespHeaders, update_headers, Opts);
 refresh_stored_responses({<<"HEAD">>, Url, ReqHeaders, ReqBody},
                          {200, RespHeaders, _},
-                         #{store := Store} = Opts) ->
+                         #{store := Store, store_opts := StoreOpts} = Opts) ->
     RequestKey = request_key({<<"GET">>, Url, ReqHeaders, ReqBody}, Opts),
-    Candidates = Store:list_candidates(RequestKey),
+    Candidates = Store:list_candidates(RequestKey, StoreOpts),
     ParsedRespHeaders =
         parse_headers(RespHeaders, [<<"etag">>, <<"last-modified">>, <<"content-length">>]),
     CandidatesToUpdate =
@@ -1675,9 +1689,9 @@ update_candidates([{RespRef, _, _, _, #{alternate_keys := AltKeys}} | Rest],
                   Request,
                   RespHeaders,
                   Type,
-                  #{store := Store} = Opts) ->
+                  #{store := Store, store_opts := StoreOpts} = Opts) ->
     try
-        {Status, StoredRespHeaders, BodyOrFile, _} = Store:get_response(RespRef),
+        {Status, StoredRespHeaders, BodyOrFile, _} = Store:get_response(RespRef, StoreOpts),
         RespBody = get_body_content(BodyOrFile),
         UpdatedRespHeaders =
             case Type of

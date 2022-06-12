@@ -985,7 +985,7 @@ rfc7234_section_4_2_1_smaxage_shared(Opts) ->
                              <<"Some content">>},
                             Opts),
            {fresh, {RespRef, _}} = http_cache:get(Req, Opts),
-           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef),
+           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef, []),
            Expires
         end,
     {spawn, ?_assertEqual(unix_now() + 3, F())}.
@@ -1002,7 +1002,7 @@ rfc7234_section_4_2_1_smaxage_private(Opts) ->
                              <<"Some content">>},
                             OptsPriv),
            {fresh, {RespRef, _}} = http_cache:get(Req, Opts),
-           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef),
+           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef, []),
            Expires
         end,
     {spawn, ?_assertEqual(unix_now() + 5, F())}.
@@ -1018,7 +1018,7 @@ rfc7234_section_4_2_1_maxage(Opts) ->
                              <<"Some content">>},
                             Opts),
            {fresh, {RespRef, _}} = http_cache:get(Req, Opts),
-           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef),
+           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef, []),
            Expires
         end,
     {spawn, ?_assertEqual(unix_now() + 5, F())}.
@@ -1033,7 +1033,7 @@ rfc7234_section_4_2_1_expires(Opts) ->
                              <<"Some content">>},
                             Opts),
            {fresh, {RespRef, _}} = http_cache:get(Req, Opts),
-           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef),
+           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef, []),
            Expires
         end,
     {spawn, ?_assertEqual(unix_now() + 7, F())}.
@@ -1049,7 +1049,7 @@ rfc7234_section_4_2_2_heuristics_no_used(Opts) ->
                              <<"Some content">>},
                             Opts),
            {fresh, {RespRef, _}} = http_cache:get(Req, Opts),
-           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef),
+           {_, _, _, #{expires := Expires}} = Store:get_response(RespRef, []),
            Expires
         end,
     {spawn, ?_assertNotEqual(unix_now() + TTL, F())}.

@@ -13,10 +13,10 @@
 
 -behaviour(http_cache_store).
 
--export([list_candidates/1, get_response/1, put/5, invalidate_url/1,
-         invalidate_by_alternate_key/1, notify_response_used/1, save_in_file/0]).
+-export([list_candidates/2, get_response/2, put/6, invalidate_url/2,
+         invalidate_by_alternate_key/2, notify_response_used/2, save_in_file/0]).
 
-list_candidates(ReqKey) ->
+list_candidates(ReqKey, _Opts) ->
     Now = unix_now(),
     [{RespRef, Status, Headers, VaryHeaders, RespMetadata}
      || {{ObjReqKey, VaryHeaders} = RespRef,
@@ -25,7 +25,7 @@ list_candidates(ReqKey) ->
         ObjReqKey == ReqKey,
         Grace >= Now].
 
-get_response(RespRef) ->
+get_response(RespRef, _Opts) ->
     case get(RespRef) of
         {{Status, Headers, Body}, _UrlDigest, RespMetadata, _LastUsed} ->
             {Status, Headers, Body, RespMetadata};
@@ -33,7 +33,12 @@ get_response(RespRef) ->
             undefined
     end.
 
-put(ReqKey, UrlDigest, VaryHeaders, {Status, RespHeaders, RespBody0}, RespMetadata) ->
+put(ReqKey,
+    UrlDigest,
+    VaryHeaders,
+    {Status, RespHeaders, RespBody0},
+    RespMetadata,
+    _Opts) ->
     RespBody1 =
         case get({?MODULE, save_in_file}) of
             true ->
@@ -50,7 +55,7 @@ put(ReqKey, UrlDigest, VaryHeaders, {Status, RespHeaders, RespBody0}, RespMetada
     put(RespRef, {{Status, RespHeaders, RespBody1}, UrlDigest, RespMetadata, unix_now()}),
     ok.
 
-invalidate_url(SearchedUrlDigest) ->
+invalidate_url(SearchedUrlDigest, _Opts) ->
     ToInvalidate =
         [RespRef
          || {RespRef, {_Response, UrlDigest, _RespMetadata, _LastUsed}} <- get(),
@@ -59,7 +64,7 @@ invalidate_url(SearchedUrlDigest) ->
     [erase(RespRef) || RespRef <- ToInvalidate],
     {ok, NbInvalidated}.
 
-invalidate_by_alternate_key(Searched) ->
+invalidate_by_alternate_key(Searched, _Opts) ->
     ToInvalidate =
         [RespRef
          || {RespRef, {_Response, _UrlDigest, #{alternate_keys := AltKeys}, _LastUsed}} <- get(),
@@ -68,7 +73,7 @@ invalidate_by_alternate_key(Searched) ->
     [erase(RespRef) || RespRef <- ToInvalidate],
     {ok, NbInvalidated}.
 
-notify_response_used(RespRef) ->
+notify_response_used(RespRef, _Opts) ->
     case get(RespRef) of
         {Response, UrlDigest, RespMetadata, _LastUsed} ->
             put(RespRef, {Response, UrlDigest, RespMetadata, unix_now()});
