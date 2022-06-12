@@ -797,8 +797,83 @@ do_invalidate_by_alternate_key(AltKey, #{store := _} = Opts) ->
     do_invalidate_by_alternate_key([AltKey], Opts).
 
 %%====================================================================
-%% Internal functions
+%% Internal functions related to response selection
 %%====================================================================
+
+request_key({Method, Url, _Headers, Body}, Opts) ->
+    % method is case-sensitive, no need to normalize
+    MethodDigest = crypto:hash(sha256, Method),
+    UrlDigest = url_digest(Url, Opts),
+    BodyDigest = crypto:hash(sha256, iolist_to_binary(Body)),
+    BucketDigest = crypto:hash(sha256, erlang:term_to_binary(map_get(bucket, Opts))),
+    crypto:hash(sha256,
+                <<MethodDigest/binary, UrlDigest/binary, BodyDigest/binary, BucketDigest/binary>>).
+
+url_digest(Url, Opts) ->
+    NormUrl = uri_string:normalize(Url),
+    #{host := Host, path := Path} = ParsedUrl = uri_string:parse(NormUrl),
+    NormQuery = normalize_query(ParsedUrl, Opts),
+    BucketDigest = crypto:hash(sha256, erlang:term_to_binary(map_get(bucket, Opts))),
+    crypto:hash(sha256, <<Host/binary, Path/binary, NormQuery/binary, BucketDigest/binary>>).
+
+normalize_query(#{query := Query}, #{ignore_query_params_order := true}) ->
+    DissectedQuery = uri_string:dissect_query(Query),
+    OrderedQuery = lists:sort(DissectedQuery),
+    uri_string:compose_query(OrderedQuery);
+normalize_query(#{query := Query}, _Opts) ->
+    Query;
+normalize_query(_ParsedUrl, _Opts) ->
+    <<"">>.
+
+normalize_headers(Headers, WhichHeaders) ->
+    maps:merge(
+        maps:from_keys(WhichHeaders, undefined), normalize_headers(Headers, WhichHeaders, #{})).
+
+normalize_headers([], _WhichHeaders, NormHeaders) ->
+    NormHeaders;
+normalize_headers([{Name, Value} | Rest], WhichHeaders, NormHeaders) ->
+    NormName = normalize_header_name(Name),
+    case lists:member(NormName, WhichHeaders) of
+        true ->
+            NormValue = normalize_header_value(Value),
+            case NormHeaders of
+                #{NormName := AccumulatedValue} ->
+                    NewValue = <<AccumulatedValue/binary, ", ", NormValue/binary>>,
+                    normalize_headers(Rest,
+                                      WhichHeaders,
+                                      maps:put(NormName, NewValue, NormHeaders));
+                _ ->
+                    normalize_headers(Rest,
+                                      WhichHeaders,
+                                      maps:put(NormName, NormValue, NormHeaders))
+            end;
+        false ->
+            normalize_headers(Rest, WhichHeaders, NormHeaders)
+    end.
+
+normalize_header_name(HeaderName) ->
+    string:lowercase(
+        string:trim(HeaderName, both, " ")).
+
+normalize_header_value(HeaderValue) ->
+    string:trim(HeaderValue, both, " \t").
+
+normalize_opts(Opts) ->
+    case proplists:get_value(store, Opts, undefined) of
+        undefined ->
+            erlang:error(no_store_configured);
+        _ ->
+            ok
+    end,
+    UserOpts = proplists:to_map(Opts),
+    NormUserOpts =
+        case UserOpts of
+            #{auto_compress := true} ->
+                maps:put(auto_decompress, true, UserOpts);
+            _ ->
+                UserOpts
+        end,
+    maps:merge(?DEFAULT_OPTS, NormUserOpts).
 
 select_candidate(_ReqHeaders,
                  _ParsedReqHeaders,
@@ -1043,6 +1118,10 @@ resp_proxy_must_revalidate(#{<<"cache-control">> := #{<<"proxy-revalidate">> := 
 resp_proxy_must_revalidate(_, _) ->
     false.
 
+%%====================================================================
+%% Internal functions related to response post-processing
+%%====================================================================
+
 set_age_header({Status, RespHeaders0, RespBody}, #{created := Created}) ->
     AgeBin = list_to_binary(integer_to_list(unix_now() - Created)),
     RespHeaders1 = delete_header(<<"age">>, RespHeaders0),
@@ -1056,80 +1135,9 @@ handle_file_body({Status, RespHeaders, {file, FilePath}}) ->
 handle_file_body(Response) ->
     Response.
 
-request_key({Method, Url, _Headers, Body}, Opts) ->
-    % method is case-sensitive, no need to normalize
-    MethodDigest = crypto:hash(sha256, Method),
-    UrlDigest = url_digest(Url, Opts),
-    BodyDigest = crypto:hash(sha256, iolist_to_binary(Body)),
-    BucketDigest = crypto:hash(sha256, erlang:term_to_binary(map_get(bucket, Opts))),
-    crypto:hash(sha256,
-                <<MethodDigest/binary, UrlDigest/binary, BodyDigest/binary, BucketDigest/binary>>).
-
-url_digest(Url, Opts) ->
-    NormUrl = uri_string:normalize(Url),
-    #{host := Host, path := Path} = ParsedUrl = uri_string:parse(NormUrl),
-    NormQuery = normalize_query(ParsedUrl, Opts),
-    BucketDigest = crypto:hash(sha256, erlang:term_to_binary(map_get(bucket, Opts))),
-    crypto:hash(sha256, <<Host/binary, Path/binary, NormQuery/binary, BucketDigest/binary>>).
-
-normalize_query(#{query := Query}, #{ignore_query_params_order := true}) ->
-    DissectedQuery = uri_string:dissect_query(Query),
-    OrderedQuery = lists:sort(DissectedQuery),
-    uri_string:compose_query(OrderedQuery);
-normalize_query(#{query := Query}, _Opts) ->
-    Query;
-normalize_query(_ParsedUrl, _Opts) ->
-    <<"">>.
-
-normalize_headers(Headers, WhichHeaders) ->
-    maps:merge(
-        maps:from_keys(WhichHeaders, undefined), normalize_headers(Headers, WhichHeaders, #{})).
-
-normalize_headers([], _WhichHeaders, NormHeaders) ->
-    NormHeaders;
-normalize_headers([{Name, Value} | Rest], WhichHeaders, NormHeaders) ->
-    NormName = normalize_header_name(Name),
-    case lists:member(NormName, WhichHeaders) of
-        true ->
-            NormValue = normalize_header_value(Value),
-            case NormHeaders of
-                #{NormName := AccumulatedValue} ->
-                    NewValue = <<AccumulatedValue/binary, ", ", NormValue/binary>>,
-                    normalize_headers(Rest,
-                                      WhichHeaders,
-                                      maps:put(NormName, NewValue, NormHeaders));
-                _ ->
-                    normalize_headers(Rest,
-                                      WhichHeaders,
-                                      maps:put(NormName, NormValue, NormHeaders))
-            end;
-        false ->
-            normalize_headers(Rest, WhichHeaders, NormHeaders)
-    end.
-
-normalize_header_name(HeaderName) ->
-    string:lowercase(
-        string:trim(HeaderName, both, " ")).
-
-normalize_header_value(HeaderValue) ->
-    string:trim(HeaderValue, both, " \t").
-
-normalize_opts(Opts) ->
-    case proplists:get_value(store, Opts, undefined) of
-        undefined ->
-            erlang:error(no_store_configured);
-        _ ->
-            ok
-    end,
-    UserOpts = proplists:to_map(Opts),
-    NormUserOpts =
-        case UserOpts of
-            #{auto_compress := true} ->
-                maps:put(auto_decompress, true, UserOpts);
-            _ ->
-                UserOpts
-        end,
-    maps:merge(?DEFAULT_OPTS, NormUserOpts).
+%%====================================================================
+%% Internal functions related to response caching
+%%====================================================================
 
 % Invalidating POST requests is a grey zone: POST requests can be cached when there is
 % explicit cache information (RFC7231 section 4.3.3) but POST requests are unsafe and must also
@@ -1304,6 +1312,10 @@ grace(Expires, #{default_grace := Grace}) ->
 cache_type(#{type := Type}) ->
     Type.
 
+%%====================================================================
+%% Internal functions related to compression
+%%====================================================================
+
 handle_auto_decompress(ParsedReqHeaders,
                        {Status, RespHeaders0, BodyOrFile} = Response,
                        #{parsed_headers :=
@@ -1342,6 +1354,10 @@ handle_auto_decompress(ParsedReqHeaders,
     end;
 handle_auto_decompress(_ParsedReqHeaders, Response, _RespMetadata, _Opts) ->
     Response.
+
+%%====================================================================
+%% Internal functions related to range requests
+%%====================================================================
 
 handle_range_request(_Request,
                      #{<<"cache-control">> := #{<<"no-transform">> := _}},
@@ -1528,6 +1544,10 @@ range_not_satisfiable_resp(BodySize) ->
     BodySizeBin = list_to_binary(integer_to_list(BodySize)),
     {416, [{<<"content-range">>, <<"bytes */", BodySizeBin/binary>>}], <<"">>}.
 
+%%====================================================================
+%% Internal functions related to conditional requests
+%%====================================================================
+
 handle_conditions(Request, #{<<"if-none-match">> := '*'}, Response, _RespMetadata) ->
     handle_failed_condition(Request, Response);
 handle_conditions(Request,
@@ -1579,6 +1599,10 @@ handle_failed_condition({Method, _Url, _ReqHeaders, _ReqBody},
      <<>>};
 handle_failed_condition(_Request, _Response) ->
     {412, [], <<>>}.
+
+%%====================================================================
+%% Internal functions related to response refresh
+%%====================================================================
 
 refresh_stored_responses(Request,
                          {304, RespHeaders, _},
@@ -1718,13 +1742,9 @@ update_candidates([{RespRef, _, _, _, #{alternate_keys := AltKeys}} | Rest],
     end,
     update_candidates(Rest, Request, RespHeaders, Type, Opts).
 
-update_headers(OldHeaders, NewHeaders) ->
-    HeadersToUpdate = sets:from_list([?LOWER(HeaderName) || {HeaderName, _} <- NewHeaders]),
-    lists:filter(fun({HeaderName, _}) ->
-                    not sets:is_element(?LOWER(HeaderName), HeadersToUpdate)
-                 end,
-                 OldHeaders)
-    ++ NewHeaders.
+%%====================================================================
+%% Internal util functions for headers
+%%====================================================================
 
 parse_headers(Headers, Which) ->
     parse_headers(Headers, maps:from_keys(Which, []), #{}).
@@ -1817,6 +1837,14 @@ keep_headers([{HeaderName, HeaderValue} | Rest], Which, Acc) ->
             keep_headers(Rest, Which, Acc)
     end.
 
+update_headers(OldHeaders, NewHeaders) ->
+    HeadersToUpdate = sets:from_list([?LOWER(HeaderName) || {HeaderName, _} <- NewHeaders]),
+    lists:filter(fun({HeaderName, _}) ->
+                    not sets:is_element(?LOWER(HeaderName), HeadersToUpdate)
+                 end,
+                 OldHeaders)
+    ++ NewHeaders.
+
 delete_header(ToDelete, Headers) ->
     delete_header(ToDelete, Headers, []).
 
@@ -1844,6 +1872,10 @@ strip_connection_headers([{Name, Value} | Rest]) ->
         false ->
             [{Name, Value} | strip_connection_headers(Rest)]
     end.
+
+%%====================================================================
+%% Other internal util functions
+%%====================================================================
 
 get_body_content({file, FilePath}) ->
     {ok, Content} = file:read_file(FilePath),
