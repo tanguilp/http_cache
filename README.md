@@ -74,7 +74,7 @@ dependency if you need to use it.
 
 RFC9111: [HTTP Caching](https://www.rfc-editor.org/rfc/rfc9111.html):
 - [-] 3. Storing Responses in Caches
-  - [ ] 3.1. Storing Header and Trailer Fields
+  - [x] 3.1. Storing Header and Trailer Fields
   - [x] 3.2. Updating Stored Header Fields
   - [ ] 3.3. Storing Incomplete Responses
   - [ ] 3.4. Combining Partial Content
