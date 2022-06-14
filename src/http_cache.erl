@@ -358,7 +358,6 @@
           max_ranges => 100,
           store_opts => [],
           type => shared}).
--define(GZIP_MAGIC_BYTES, 31, 139).
 -define(PDICT_MEASUREMENTS, http_cache_measurments).
 -define(TELEMETRY_LOOKUP_EVT, [http_cache, lookup]).
 -define(TELEMETRY_CACHE_EVT, [http_cache, cache]).
