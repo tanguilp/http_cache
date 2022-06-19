@@ -382,13 +382,9 @@
 %%
 %% The function returns one of:
 %% <dl>
-%%    <dt>`{fresh, {http_cache_store:response_ref() | not_found, response()}}'</dt>
+%%    <dt>`{fresh, {http_cache_store:response_ref(), response()}}'</dt>
 %%    <dd>
 %%    The response is fresh and can be returned directly to the client.
-%%
-%%    A `504' response is returned when the `only-if-cached' cache
-%%    control request header is used and no suitable response was found.
-%%    In this case the request reference is set to `not_found'
 %%    </dd>
 %%    <dt>`{stale, {http_cache_store:response_ref(), response()}}'</dt>
 %%    <dd>
@@ -423,7 +419,7 @@
 %%------------------------------------------------------------------------------
 
 -spec get(request(), opts()) ->
-             {fresh, {http_cache_store:response_ref() | not_found, response()}} |
+             {fresh, {http_cache_store:response_ref(), response()}} |
              {stale, {http_cache_store:response_ref(), response()}} |
              {must_revalidate, {http_cache_store:response_ref(), response()}} |
              miss.
@@ -508,7 +504,7 @@ postprocess_response(Freshness,
                      _RespMetadata,
                      _Opts)
     when Freshness == must_revalidate orelse Freshness == miss ->
-    {fresh, {not_found, {504, [], <<"">>}}};
+    {fresh, {undefined, {504, [], <<"">>}}};
 postprocess_response(miss,
                      _Request,
                      _ParsedReqHeaders,
