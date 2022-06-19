@@ -1181,24 +1181,29 @@ handle_invalidation_of_unsafe_method(Request,
 
 is_cacheable(Method, ParsedReqHeaders, Status, ParsedRespHeaders, Opts) ->
     request_method_cacheable(Method, ParsedRespHeaders, Opts)
+    andalso response_status_is_final(Status)
+    andalso response_status_cacheable(Status, ParsedRespHeaders)
     andalso not
                 is_map_key(<<"no-store">>, maps:get(<<"cache-control">>, ParsedReqHeaders, #{}))
     andalso not
                 is_map_key(<<"no-store">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
-    andalso (cache_type(Opts) /= shared
+    andalso (cache_type(Opts) == private
              orelse not
                         is_map_key(<<"private">>,
                                    maps:get(<<"cache-control">>, ParsedRespHeaders, #{})))
-    andalso (cache_type(Opts) /= shared
+    andalso (cache_type(Opts) == private
              orelse not is_map_key(<<"authorization">>, ParsedReqHeaders)
              orelse response_explicitely_cacheable(ParsedRespHeaders))
-    andalso (is_map_key(<<"expires">>, ParsedRespHeaders)
+    andalso (is_map_key(<<"public">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
+             orelse cache_type(Opts) == private
+                    andalso is_map_key(<<"private">>,
+                                       maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
+             orelse is_map_key(<<"expires">>, ParsedRespHeaders)
              orelse is_map_key(<<"max-age">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
-             orelse (cache_type(Opts) == shared)
-                    and is_map_key(<<"s-maxage">>,
-                                   maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
-             orelse response_status_cacheable(Status)
-             orelse is_map_key(<<"public">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{})))
+             orelse cache_type(Opts) == shared
+                    andalso is_map_key(<<"s-maxage">>,
+                                       maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
+             orelse response_status_heuristically_cacheable(Status))
     andalso maps:get(<<"vary">>, ParsedRespHeaders, undefined) /= <<"*">>.
 
 request_method_cacheable(<<"GET">>, _, _) ->
@@ -1218,29 +1223,46 @@ request_method_cacheable(<<"POST">>, #{<<"expires">> := _}, _) ->
 request_method_cacheable(_, _, _) ->
     false.
 
-response_status_cacheable(200) ->
+response_status_is_final(100) ->
+    false;
+response_status_is_final(_) ->
+    true.
+
+response_status_cacheable(206, _) ->
+    false;
+response_status_cacheable(304, _) ->
+    false;
+response_status_cacheable(Status,
+                          #{<<"cache-control">> := #{<<"must-understand">> := _}}) ->
+    response_status_heuristically_cacheable(Status);
+response_status_cacheable(_, _) ->
+    true.
+
+response_status_heuristically_cacheable(200) ->
     true;
-response_status_cacheable(203) ->
+response_status_heuristically_cacheable(203) ->
     true;
-response_status_cacheable(204) ->
+response_status_heuristically_cacheable(204) ->
     true;
-response_status_cacheable(300) ->
+response_status_heuristically_cacheable(300) ->
     true;
-response_status_cacheable(301) ->
+response_status_heuristically_cacheable(301) ->
     true;
-response_status_cacheable(404) ->
+response_status_heuristically_cacheable(308) ->
     true;
-response_status_cacheable(405) ->
+response_status_heuristically_cacheable(404) ->
     true;
-response_status_cacheable(410) ->
+response_status_heuristically_cacheable(405) ->
     true;
-response_status_cacheable(414) ->
+response_status_heuristically_cacheable(410) ->
     true;
-response_status_cacheable(451) ->
+response_status_heuristically_cacheable(414) ->
     true;
-response_status_cacheable(501) ->
+response_status_heuristically_cacheable(451) ->
     true;
-response_status_cacheable(_) ->
+response_status_heuristically_cacheable(501) ->
+    true;
+response_status_heuristically_cacheable(_) ->
     false.
 
 response_explicitely_cacheable(#{<<"cache-control">> := #{<<"must-revalidate">> := _}}) ->
