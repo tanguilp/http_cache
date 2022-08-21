@@ -1,12 +1,11 @@
 {"1.2.0",
-[{<<"cowlib">>,
-  {git,"https://github.com/tanguilp/cowlib.git",
-       {ref,"7b6cb301923586145514817f81c49c9f5740b286"}},
-  0},
- {<<"telemetry">>,{pkg,<<"telemetry">>,<<"1.0.0">>},0}]}.
+[{<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.11.0">>},0},
+ {<<"telemetry">>,{pkg,<<"telemetry">>,<<"1.1.0">>},0}]}.
 [
 {pkg_hash,[
- {<<"telemetry">>, <<"0F453A102CDF13D506B7C0AB158324C337C41F1CC7548F0BC0E130BBF0AE9452">>}]},
+ {<<"cowlib">>, <<"0B9FF9C346629256C42EBE1EEB769A83C6CB771A6EE5960BD110AB0B9B872063">>},
+ {<<"telemetry">>, <<"A589817034A27EAB11144AD24D5C0F9FAB1F58173274B1E9BAE7074AF9CBEE51">>}]},
 {pkg_hash_ext,[
- {<<"telemetry">>, <<"73BC09FA59B4A0284EFB4624335583C528E07EC9AE76ACA96EA0673850AEC57A">>}]}
+ {<<"cowlib">>, <<"2B3E9DA0B21C4565751A6D4901C20D1B4CC25CBB7FD50D91D2AB6DD287BC86A9">>},
+ {<<"telemetry">>, <<"B727B2A1F75614774CFF2D7565B64D0DFA5BD52BA517F16543E6FC7EFCC0DF48">>}]}
 ].
