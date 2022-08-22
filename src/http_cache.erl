@@ -125,29 +125,48 @@
 -include_lib("cowlib/include/cow_inline.hrl").
 -include_lib("kernel/include/file.hrl").
 
+-type alternate_key() :: term().
+%% Alternate key attached to a stored response
+%%
+%% Used to invalidate by alternate key (e.g. to invalidate all the images if
+%% the `image' alternate key if set to all images).
+-type body() :: iodata().
+%% Request or response body
+-type headers() :: [{binary(), binary()}].
+%% Request or response headers
+%%
+%% A header can appear more than once, this is allowed by HTTP
+-type invalidation_result() ::
+    {ok, NbInvalidatedResponses :: non_neg_integer() | undefined} | {error, term()}.
+%% The invalidation result, with the count of deleted objects if the backend supports it
+%%
+%% `undefined' is returned if the backend does not support counting the number of
+%% invalidated responses.
+%%
+%% `{error, term()}' is returned by the backend in case of error.
+
 -type method() :: binary().
 %% An HTTP method, for example "PATCH"
--type url() :: binary().
--type headers() :: [{binary(), binary()}].
-%% A list of headers. Some headers can appear multiple times.
--type body() :: iodata().
--type status() :: pos_integer().
--type request() :: {method(), url(), headers(), body()}.
--type response() :: {status(), headers(), body() | sendfile()}.
--type sendfile() ::
-    {sendfile,
-     Offset :: non_neg_integer(),
-     Length :: non_neg_integer() | all,
-     Path :: binary()}.
--type alternate_key() :: term().
-%% Alternate key attached to a stored response. Used to invalidate by
-%% alternate key instead of URL (e.g. to invalidate all the images if
-%% the `image' alternate key if set to all images).
--type timestamp() :: non_neg_integer().
-%% UNIX timestamp in seconds
--type type() :: shared | private.
--type opts() :: [opt()].
-%% Options passed to the functions of this module:
+-type opt() ::
+    {alternate_keys, [alternate_key()]} |
+    {allow_stale_while_revalidate, boolean()} |
+    {allow_stale_if_error, boolean()} |
+    {auto_accept_encoding, boolean()} |
+    {auto_compress, boolean()} |
+    {auto_decompress, boolean()} |
+    {bucket, term()} |
+    {compression_threshold, non_neg_integer()} |
+    {origin_unreachable, boolean()} |
+    {default_ttl, non_neg_integer() | none} |
+    {default_grace, non_neg_integer() | none} |
+    {ignore_query_params_order, boolean()} |
+    {max_ranges, non_neg_integer()} |
+    {store, module()} |
+    {store_opts, http_cache_store:opts()} |
+    {type, type()} |
+    {request_time, non_neg_integer()}.
+%% Options passed to the functions of this module
+%%
 %% <ul>
 %%  <li>
 %%    `alternate_keys': alternate keys associated with the stored request. Requests
@@ -281,33 +300,24 @@
 %%    Used by {@link cache/3} and {@link cache/4}.
 %%  </li>
 %% </ul>
--type opt() ::
-    {alternate_keys, [alternate_key()]} |
-    {allow_stale_while_revalidate, boolean()} |
-    {allow_stale_if_error, boolean()} |
-    {auto_accept_encoding, boolean()} |
-    {auto_compress, boolean()} |
-    {auto_decompress, boolean()} |
-    {bucket, term()} |
-    {compression_threshold, non_neg_integer()} |
-    {origin_unreachable, boolean()} |
-    {default_ttl, non_neg_integer() | none} |
-    {default_grace, non_neg_integer() | none} |
-    {ignore_query_params_order, boolean()} |
-    {max_ranges, non_neg_integer()} |
-    {store, module()} |
-    {store_opts, http_cache_store:opts()} |
-    {type, type()} |
-    {request_time, non_neg_integer()}.
--type invalidation_result() ::
-    {ok, NbInvalidation :: non_neg_integer() | undefined} | {error, term()}.
-
-%% The invalidation result, with the count of deleted objects if the backend supports it
-
-%% `undefined' is returned if the backend does not support counting the number of
-%% invalidated responses.
-%%
-%% `{error, term()}' is returned by the backend in case of error.
+-type opts() :: [opt()].
+-type request() :: {method(), url(), headers(), body()}.
+%% An HTTP request
+-type response() :: {status(), headers(), body() | sendfile()}.
+%% An HTTP response
+-type url() :: binary().
+%% An URL, with the schema, domain and optionally path
+-type status() :: pos_integer().
+%% HTTP status
+-type sendfile() ::
+    {sendfile,
+     Offset :: non_neg_integer(),
+     Length :: non_neg_integer() | all,
+     Path :: binary()}.
+-type timestamp() :: non_neg_integer().
+%% UNIX timestamp in seconds
+-type type() :: shared | private.
+%% Type of the cache: shared (like proxies) or private (like browser cache)
 
 -define(DEFAULT_TTL, 2 * 60).
 -define(DEFAULT_GRACE, 2 * 60).
@@ -381,14 +391,12 @@
 %% @doc Gets a response from the cache for the given answer
 %%
 %% The function returns one of:
-%% <dl>
-%%    <dt>`{fresh, {http_cache_store:response_ref(), response()}}'</dt>
-%%    <dd>
-%%    The response is fresh and can be returned directly to the client.
-%%    </dd>
-%%    <dt>`{stale, {http_cache_store:response_ref(), response()}}'</dt>
-%%    <dd>
-%%    The response is stale but can be directly returned to the client.
+%% <ul>
+%%    <li>`{fresh, {http_cache_store:response_ref(), response()}}':
+%%    the response is fresh and can be returned directly to the client.
+%%    </li>
+%%    <li>`{stale, {http_cache_store:response_ref(), response()}}':
+%%    the response is stale but can be directly returned to the client.
 %%
 %%    Stale responses that are cached but cannot be returned do to
 %%    unfulfilled condition are not returned.
@@ -401,19 +409,16 @@
 %%        <li>`allow_stale_if_error'</li>
 %%        <li>`origin_unreachable'</li>
 %%      </ul>
-%%    </dd>
-%%    <dt>`{must_revalidate, {http_cache_store:response_ref(), response()}}'</dt>
-%%    <dd>
-%%    The response must be revalidated.
-%%    </dd>
-%%    <dt>`miss'</dt>
-%%    <dd>No suitable response was found.</dd>
-%% </dl>
+%%    </li>
+%%    <li>`{must_revalidate, {http_cache_store:response_ref(), response()}}':
+%%    the response must be revalidated.
+%%    </li>
+%%    <li>`miss': no suitable response was found. </li>
+%% </ul>
 %%
-%% Using this function does not automatically updates the last used time of the
-%% object in the cache, because a returned response may or may not be returned to
-%% the caller. Therefore, use {@link notify_response_used/2} with the
-%% returned response reference when a cached response is used.
+%% Using this function does not automatically notify the response was returned.
+%% Therefore, use {@link notify_response_used/2} with the returned response
+%% reference when a cached response is used.
 %%
 %% @end
 %%------------------------------------------------------------------------------
@@ -756,6 +761,8 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
 
 %%------------------------------------------------------------------------------
 %% @doc Invalidates all responses for a URL
+%%
+%% This includes all variants and all responses for all HTTP methods.
 %% @end
 %%------------------------------------------------------------------------------
 -spec invalidate_url(url(), opts()) -> invalidation_result().

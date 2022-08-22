@@ -3,7 +3,8 @@
 %%%
 %%% This implementation is used in this library's test and can be used in your own tests.
 %%% It stores data in the current process, and thus provides isolation. It cannot, of course, be
-%%% used in real-life because data is discarded as soon as the process dies.
+%%% used in real-life because data is discarded as soon as the process dies, and no cleanup
+%%% ever happens.
 %%%
 %%% The {@link save_in_file/0} function can be used to simulate a store that saves responses
 %%% on the disk. It saves the responses to files in `tmp' and therefore cannot be used on

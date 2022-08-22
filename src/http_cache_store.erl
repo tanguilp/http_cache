@@ -18,34 +18,11 @@
 -export_type([request_key/0, candidate/0, response/0, response_ref/0, url_digest/0,
               opts/0]).
 
--type url_digest() :: binary().
-%% Opaque URL digest as computed by the main module
--type request_key() :: binary().
-%% A unique, opaque, key for a request taking into account the request's information (method,
-%% URL, body and bucket)
--type response_ref() :: http_cache_store:response_ref().
-%% Opaque backend's reference to a response, returned by
-%% {@link http_cache:get/2} and used as a parameter by {@link http_cache:notify_response_used/2}.
--type response_metadata() ::
-    #{created := http_cache:timestamp(),
-      expires := http_cache:timestamp(),
-      grace := http_cache:timestamp(),
-      ttl_set_by := header | heuristics,
-      parsed_headers := #{binary() => term()},
-      alternate_keys := [http_cache:alternate_key()]}.
 -type body() :: binary().
-% The body transmitted to the backend is a binary so as to optimize copying around
-% data: an IOlist would have to be copied whereas (big) binaries are simply
-% reference-counted.
--type vary_headers() :: #{binary() := binary() | undefined}.
-%% Normalized headers on which the response varies
--type response() ::
-    {Status :: http_cache:status(),
-     Headers :: http_cache:headers(),
-     BodyOrFile :: body() | {file, file:name_all()},
-     Metadata :: response_metadata()}.
-%% Stored HTTP response with its metadata. The body can either be a binary (for example if the
-%% response is stored in memory) or a file (if the response is stored on disk).
+% The body transmitted to the backend
+%
+% This is a binary so as to optimize copying around data: an IOlist would have to
+% be copied whereas (big) binaries are simply reference-counted.
 -type candidate() ::
     {RespRef :: response_ref(),
      Status :: http_cache:status(),
@@ -53,6 +30,33 @@
      VaryHeaders :: vary_headers(),
      RespMetadata :: response_metadata()}.
 -type opts() :: any().
+%% Options for the backend store
+-type request_key() :: binary().
+%% A unique, opaque, key for a request taking into account the request's information (method,
+%% URL, body and bucket)
+-type response() ::
+    {Status :: http_cache:status(),
+     Headers :: http_cache:headers(),
+     BodyOrFile :: body() | {file, file:name_all()},
+     Metadata :: response_metadata()}.
+%% Stored HTTP response with its metadata
+%%
+%% The body can either be a binary (for example if the
+%% response is stored in memory) or a file (if the response is stored on disk).
+-type response_metadata() ::
+    #{created := http_cache:timestamp(),
+      expires := http_cache:timestamp(),
+      grace := http_cache:timestamp(),
+      ttl_set_by := header | heuristics,
+      parsed_headers := #{binary() => term()},
+      alternate_keys := [http_cache:alternate_key()]}.
+-type response_ref() :: http_cache_store:response_ref().
+%% Opaque backend's reference to a response, returned by
+%% {@link http_cache:get/2} and used as a parameter by {@link http_cache:notify_response_used/2}.
+-type url_digest() :: binary().
+%% Opaque URL digest as computed by the main module
+-type vary_headers() :: #{binary() := binary() | undefined}.
+%% Normalized headers on which the response varies
 
 -callback list_candidates(RequestKey :: request_key(), Opts :: opts()) -> [candidate()].
 %% Returns the list of candidates matching a request, via its request key
@@ -66,7 +70,7 @@
               RespMetadata :: response_metadata(),
               Opts :: opts()) ->
                  ok | {error, term()}.
-%% Saves a response and associated metadata
+%% Stores a response and associated metadata
 -callback notify_response_used(RespRef :: response_ref(), Opts :: opts()) ->
                                   ok | {error, term()}.
 %% Notify that a response was used. A LRU cache, for instance, would update the timestamp
