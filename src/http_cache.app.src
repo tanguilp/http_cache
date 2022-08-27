@@ -1,10 +1,10 @@
 {application,
  http_cache,
- [{description, "An OTP library"},
+ [{description, "HTTP caching library"},
   {vsn, "0.1.0"},
   {registered, []},
   {applications, [kernel, stdlib]},
   {env, []},
   {modules, []},
   {licenses, ["Apache 2.0"]},
-  {links, []}]}.
+  {links, [{"github", "https://github.com/tanguilp/http_cache"}]}]}.
