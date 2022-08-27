@@ -83,7 +83,7 @@ notify_response_used(RespRef, _Opts) ->
     end.
 
 %%------------------------------------------------------------------------------
-%% @doc Save store response in a file
+%% @doc Saves response into a file
 %%
 %% When called before saving, it instructs this implementation to store the response in a file
 %% in `/tmp'. Not thaat it works only on UNIX systems.
