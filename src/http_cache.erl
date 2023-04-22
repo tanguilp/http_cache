@@ -117,8 +117,8 @@
 -module(http_cache).
 
 %% API exports
--export([get/2, notify_downloading/3, notify_response_used/2, cache/3, cache/4, invalidate_url/2,
-         invalidate_by_alternate_key/2]).
+-export([get/2, notify_downloading/3, notify_response_used/2, cache/3, cache/4,
+         invalidate_url/2, invalidate_by_alternate_key/2]).
 
 -export_type([alternate_key/0, headers/0, request/0, response/0, status/0, timestamp/0]).
 
@@ -148,24 +148,24 @@
 
 -type method() :: binary().
 %% An HTTP method, for example "PATCH"
--type opt() ::
-    {alternate_keys, [alternate_key()]} |
-    {allow_stale_while_revalidate, boolean()} |
-    {allow_stale_if_error, boolean()} |
-    {auto_accept_encoding, boolean()} |
-    {auto_compress, boolean()} |
-    {auto_decompress, boolean()} |
-    {bucket, term()} |
-    {compression_threshold, non_neg_integer()} |
-    {origin_unreachable, boolean()} |
-    {default_ttl, non_neg_integer() | none} |
-    {default_grace, non_neg_integer() | none} |
-    {ignore_query_params_order, boolean()} |
-    {max_ranges, non_neg_integer()} |
-    {store, module()} |
-    {store_opts, http_cache_store:opts()} |
-    {type, type()} |
-    {request_time, non_neg_integer()}.
+-type opts() ::
+    #{store := module(),
+      alternate_keys => [alternate_key()],
+      allow_stale_while_revalidate => boolean(),
+      allow_stale_if_error => boolean(),
+      auto_accept_encoding => boolean(),
+      auto_compress => boolean(),
+      auto_decompress => boolean(),
+      bucket => term(),
+      compression_threshold => non_neg_integer(),
+      origin_unreachable => boolean(),
+      default_ttl => non_neg_integer(),
+      default_grace => non_neg_integer(),
+      ignore_query_params_order => boolean(),
+      max_ranges => non_neg_integer(),
+      request_time => non_neg_integer(),
+      store_opts => http_cache_store:opts(),
+      type => type()}.
 %% Options passed to the functions of this module
 %%
 %% <ul>
@@ -301,7 +301,6 @@
 %%    Used by {@link cache/3} and {@link cache/4}.
 %%  </li>
 %% </ul>
--type opts() :: [opt()].
 -type request() :: {method(), url(), headers(), body()}.
 %% An HTTP request
 -type response() :: {status(), headers(), body() | sendfile()}.
@@ -433,7 +432,7 @@
 get(Request, Opts) ->
     try
         telemetry_start_measurement(total_time),
-        Result = do_get(Request, normalize_opts(Opts)),
+        Result = do_get(Request, init_opts(Opts)),
         telemetry_stop_measurement(total_time),
         telemetry_send_event(?TELEMETRY_LOOKUP_EVT),
         Result
@@ -569,7 +568,7 @@ notify_downloading(_Request, _Pid, _Opts) ->
 -spec notify_response_used(http_cache_store:response_ref(), opts()) ->
                               ok | {error, term()}.
 notify_response_used(RespRef, Opts) ->
-    #{store := Store, store_opts := StoreOpts} = normalize_opts(Opts),
+    #{store := Store, store_opts := StoreOpts} = init_opts(Opts),
     Store:notify_response_used(RespRef, StoreOpts).
 
 %%------------------------------------------------------------------------------
@@ -599,7 +598,7 @@ notify_response_used(RespRef, Opts) ->
 -spec cache(request(), response(), opts()) -> {ok, response()} | not_cacheable.
 cache(Request, Response, Opts) ->
     telemetry_start_measurement(total_time),
-    Result = do_cache(Request, Response, normalize_opts(Opts)),
+    Result = do_cache(Request, Response, init_opts(Opts)),
     telemetry_stop_measurement(total_time),
     telemetry_send_event(?TELEMETRY_CACHE_EVT),
     Result.
@@ -639,7 +638,7 @@ do_cache(Request, Response, NormOpts) ->
                {ok, response()} | not_cacheable.
 cache(Request, Response, RevalidatedResponse, Opts) ->
     telemetry_start_measurement(total_time),
-    Result = do_cache(Request, Response, RevalidatedResponse, normalize_opts(Opts)),
+    Result = do_cache(Request, Response, RevalidatedResponse, init_opts(Opts)),
     telemetry_stop_measurement(total_time),
     telemetry_send_event(?TELEMETRY_CACHE_EVT),
     Result.
@@ -780,7 +779,7 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
 %%------------------------------------------------------------------------------
 -spec invalidate_url(url(), opts()) -> invalidation_result().
 invalidate_url(Url, Opts) ->
-    do_invalidate_url(Url, normalize_opts(Opts)).
+    do_invalidate_url(Url, init_opts(Opts)).
 
 do_invalidate_url(Url, #{store := Store, store_opts := StoreOpts} = Opts) ->
     UrlDigest = url_digest(Url, Opts),
@@ -795,7 +794,7 @@ do_invalidate_url(Url, #{store := Store, store_opts := StoreOpts} = Opts) ->
 -spec invalidate_by_alternate_key(alternate_key() | [alternate_key()], opts()) ->
                                      invalidation_result().
 invalidate_by_alternate_key(AltKeys, Opts) ->
-    do_invalidate_by_alternate_key(AltKeys, normalize_opts(Opts)).
+    do_invalidate_by_alternate_key(AltKeys, init_opts(Opts)).
 
 do_invalidate_by_alternate_key([], _Opts) ->
     {ok, 0};
@@ -871,22 +870,17 @@ normalize_header_name(HeaderName) ->
 normalize_header_value(HeaderValue) ->
     string:trim(HeaderValue, both, " \t").
 
-normalize_opts(Opts) ->
-    case proplists:get_value(store, Opts, undefined) of
-        undefined ->
-            erlang:error(no_store_configured);
-        _ ->
-            ok
-    end,
-    UserOpts = proplists:to_map(Opts),
-    NormUserOpts =
-        case UserOpts of
+init_opts(#{store := Store} = Opts0) when is_atom(Store) ->
+    Opts1 =
+        case Opts0 of
             #{auto_compress := true} ->
-                maps:put(auto_decompress, true, UserOpts);
+                maps:put(auto_decompress, true, Opts0);
             _ ->
-                UserOpts
+                Opts0
         end,
-    maps:merge(?DEFAULT_OPTS, NormUserOpts).
+    maps:merge(?DEFAULT_OPTS, Opts1);
+init_opts(_Opts) ->
+    erlang:error(no_store_configured).
 
 select_candidate(_ReqHeaders,
                  _ParsedReqHeaders,

@@ -30,8 +30,8 @@ Finally, many telemetry events are emitted. See the documentation of the main mo
 2> Resp = {200, [{<<"content-type">>, <<"text/plain">>}], <<"Cache me">>}.
 {200,[{<<"content-type">>,<<"text/plain">>}],<<"Cache me">>}
 
-3> Opts = [{store, http_cache_store_process}, {type, shared}].
-[{store,http_cache_store_process},{type,shared}]
+3> Opts = #{store => http_cache_store_process, type => shared}.
+#{store => http_cache_store_process, type => shared}
 
 4> http_cache:cache(Req, Resp, Opts).
 {ok,{200,

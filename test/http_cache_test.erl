@@ -123,7 +123,7 @@ opt_allow_stale_while_revalidate(Opts) ->
       ?_assertMatch({stale, _},
                     begin
                         Store(),
-                        http_cache:get(Req, [{allow_stale_while_revalidate, true} | Opts])
+                        http_cache:get(Req, Opts#{allow_stale_while_revalidate => true})
                     end)},
      {spawn,
       ?_assertMatch({must_revalidate, _},
@@ -144,7 +144,7 @@ opt_allow_stale_if_error_req_header(Opts) ->
       ?_assertMatch({stale, _},
                     begin
                         Store(),
-                        http_cache:get(Req, [{allow_stale_if_error, true} | Opts])
+                        http_cache:get(Req, Opts#{allow_stale_if_error => true})
                     end)},
      {spawn,
       ?_assertMatch({must_revalidate, _},
@@ -167,7 +167,7 @@ opt_allow_stale_if_error_resp_header(Opts) ->
       ?_assertMatch({stale, _},
                     begin
                         Store(),
-                        http_cache:get(Req, [{allow_stale_if_error, true} | Opts])
+                        http_cache:get(Req, Opts#{allow_stale_if_error => true})
                     end)},
      {spawn,
       ?_assertMatch({must_revalidate, _},
@@ -189,7 +189,7 @@ opt_auto_accept_encoding(Opts) ->
                              <<"Some encoded content">>},
                             Opts),
            http_cache:get({<<"GET">>, ?TEST_URL, Headers, <<"">>},
-                          set_opt(auto_accept_encoding, true, Opts))
+                          Opts#{auto_accept_encoding => true})
         end,
     [{spawn, ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzip">>}]) end)},
      {spawn, ?_assertMatch({fresh, _}, begin F([{<<"accept-encoding">>, <<"gzip,br">>}]) end)},
@@ -229,10 +229,10 @@ opt_auto_compress(Opts) ->
                              [{<<"content-type">>, <<"text/plain; charset=utf-8">>},
                               {<<"etag">>, <<"W/\"some-weak-etag\"">>}],
                              Body},
-                            set_opt(auto_compress, true, Opts)),
+                            Opts#{auto_compress => true}),
            {fresh, {_, {200, RespHeaders, RespBody}}} =
                http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
-                              set_opt(auto_compress, true, Opts)),
+                              Opts#{auto_compress => true}),
            {proplists:get_value(<<"content-encoding">>, RespHeaders),
             proplists:get_value(<<"vary">>, RespHeaders),
             RespBody}
@@ -250,9 +250,8 @@ opt_auto_compress_strong_etags(Opts) ->
                              [{<<"content-type">>, <<"text/plain; charset=utf-8">>},
                               {<<"etag">>, <<"\"some-strong-etag\"">>}],
                              Body},
-                            set_opt(auto_compress, true, Opts)),
-           http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
-                          set_opt(auto_compress, true, Opts))
+                            Opts#{auto_compress => true}),
+           http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>}, Opts#{auto_compress => true})
         end,
     [{spawn, ?_assertMatch({fresh, {_, {_, _, Body}}}, F([]))},
      {spawn,
@@ -267,12 +266,10 @@ opt_auto_decompress(Opts) ->
                              [{<<"content-encoding">>, <<"gzip">>},
                               {<<"vary">>, <<"accept-encoding">>}],
                              GzippedBody},
-                            set_opt(auto_decompress, true, Opts)),
+                            Opts#{auto_decompress => true}),
            {fresh, {_, {200, RespHeaders, RespBody}}} =
                http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
-                              set_opt(auto_accept_encoding,
-                                      true,
-                                      set_opt(auto_decompress, true, Opts))),
+                              Opts#{auto_accept_encoding => true, auto_decompress => true}),
            {proplists:get_value(<<"content-encoding">>, RespHeaders),
             proplists:get_value(<<"vary">>, RespHeaders),
             RespBody}
@@ -294,12 +291,10 @@ opt_auto_decompress_multiple_content_encodings(Opts) ->
                              [{<<"content-encoding">>, <<"identity, gzip">>},
                               {<<"vary">>, <<"accept-encoding">>}],
                              GzippedBody},
-                            set_opt(auto_decompress, true, Opts)),
+                            Opts#{auto_decompress => true}),
            {fresh, {_, {200, RespHeaders, RespBody}}} =
                http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>},
-                              set_opt(auto_accept_encoding,
-                                      true,
-                                      set_opt(auto_decompress, true, Opts))),
+                              Opts#{auto_accept_encoding => true, auto_decompress => true}),
            {proplists:get_value(<<"content-encoding">>, RespHeaders), RespBody}
         end,
     {spawn, ?_assertMatch({<<"identity">>, Body}, F())}.
@@ -314,9 +309,9 @@ opt_auto_decompress_when_body_is_a_file(Opts) ->
                              [{<<"content-encoding">>, <<"gzip">>},
                               {<<"vary">>, <<"accept-encoding">>}],
                              GzippedBody},
-                            set_opt(auto_decompress, true, Opts)),
+                            Opts#{auto_decompress => true}),
            http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>},
-                          set_opt(auto_accept_encoding, true, set_opt(auto_decompress, true, Opts)))
+                          Opts#{auto_accept_encoding => true, auto_decompress => true})
         end,
     {spawn, ?_assertMatch({fresh, {_, {_, _, <<"Some content">>}}}, F())}.
 
@@ -330,9 +325,9 @@ opt_auto_decompress_strong_etags(Opts) ->
                               {<<"vary">>, <<"accept-encoding">>},
                               {<<"etag">>, <<"\"some-strong-etag\"">>}],
                              GzippedBody},
-                            set_opt(auto_decompress, true, Opts)),
+                            Opts#{auto_decompress => true}),
            http_cache:get({<<"GET">>, ?TEST_URL, ReqHeaders, <<"">>},
-                          set_opt(auto_accept_encoding, true, set_opt(auto_decompress, true, Opts)))
+                          Opts#{auto_accept_encoding => true, auto_decompress => true})
         end,
     [{spawn, ?_assertMatch(miss, F([]))},
      {spawn, ?_assertMatch(miss, F([{<<"accept-encoding">>, <<"identity">>}]))},
@@ -346,16 +341,14 @@ opt_compression_threshold(Opts) ->
     F = fun(Threshold) ->
            http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [{<<"content-type">>, <<"text/plain">>}], Body},
-                            set_opt(compression_threshold,
-                                    Threshold,
-                                    set_opt(auto_compress, true, Opts)))
+                            Opts#{compression_threshold => Threshold, auto_compress => true})
         end,
     [{spawn, ?_assertMatch({ok, {_, _, GzippedBody}}, F(0))},
      {spawn, ?_assertMatch({ok, {_, _, Body}}, F(1000))}].
 
 opt_bucket(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-    OptsWithBucket = [{bucket, another_bucket} | Opts],
+    OptsWithBucket = Opts#{bucket => another_bucket},
     Store = fun() -> http_cache:cache(Req, {200, [], <<"Some content">>}, OptsWithBucket) end,
     [{spawn,
       ?_assertMatch({fresh, _},
@@ -382,7 +375,7 @@ opt_origin_unreachable(Opts) ->
       ?_assertMatch({stale, _},
                     begin
                         Store(),
-                        http_cache:get(Req, [{origin_unreachable, true} | Opts])
+                        http_cache:get(Req, Opts#{origin_unreachable => true})
                     end)},
      {spawn,
       ?_assertMatch({must_revalidate, _},
@@ -395,7 +388,7 @@ opt_default_ttl(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     Store =
         fun(TTL) ->
-           http_cache:cache(Req, {200, [], <<"Some content">>}, [{default_ttl, TTL} | Opts])
+           http_cache:cache(Req, {200, [], <<"Some content">>}, Opts#{default_ttl => TTL})
         end,
     [{spawn,
       ?_assertMatch({fresh, _},
@@ -413,12 +406,12 @@ opt_default_ttl(Opts) ->
 opt_ignore_query_params_order(Opts) ->
     Req = {<<"GET">>, <<"http://example.com/?a=1&b">>, [], <<"">>},
     ReqRev = {<<"GET">>, <<"http://example.com/?b&a=1">>, [], <<"">>},
-    OptsIgnore = [{ignore_query_params_order, true} | Opts],
+    OptsIgnore = Opts#{ignore_query_params_order => true},
     Store =
         fun(DoIgnore) ->
            http_cache:cache(Req,
                             {200, [], <<"Some content">>},
-                            [{ignore_query_params_order, DoIgnore} | Opts])
+                            Opts#{ignore_query_params_order => DoIgnore})
         end,
     [{spawn,
       ?_assertMatch({fresh, _},
@@ -447,7 +440,7 @@ opt_ignore_query_params_order(Opts) ->
 
 opt_type(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-    OptsPriv = set_opt(type, private, Opts),
+    OptsPriv = Opts#{type => private},
     Store =
         fun(SelectedOpts) ->
            http_cache:cache(Req,
@@ -473,7 +466,7 @@ opt_request_time(Opts) ->
     F = fun() ->
            http_cache:cache(Req,
                             {200, [{<<"Age">>, <<"2">>}], <<"Some content">>},
-                            set_opt(request_time, Now - 3, Opts)),
+                            Opts#{request_time => Now - 3}),
            {fresh, {_, {_, Headers, _}}} = http_cache:get(Req, Opts),
            proplists:get_value(<<"age">>, Headers)
         end,
@@ -492,9 +485,7 @@ invalidate_by_alternate_key(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     AltKey = {any, [#{term => works}]},
     F = fun() ->
-           http_cache:cache(Req,
-                            {200, [], <<"Some content">>},
-                            set_opt(alternate_keys, [AltKey], Opts)),
+           http_cache:cache(Req, {200, [], <<"Some content">>}, Opts#{alternate_keys => [AltKey]}),
            http_cache:invalidate_by_alternate_key(AltKey, Opts),
            http_cache:get(Req, Opts)
         end,
@@ -504,9 +495,7 @@ invalidate_by_alternate_keys(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
     AltKey = {any, [#{term => works}]},
     F = fun() ->
-           http_cache:cache(Req,
-                            {200, [], <<"Some content">>},
-                            set_opt(alternate_keys, [AltKey], Opts)),
+           http_cache:cache(Req, {200, [], <<"Some content">>}, Opts#{alternate_keys => [AltKey]}),
            http_cache:invalidate_by_alternate_key([<<"some key">>, AltKey, <<"some other key">>],
                                                   Opts),
            http_cache:get(Req, Opts)
@@ -535,7 +524,7 @@ cache_3_transforms_response_compression(Opts) ->
      ?_assertMatch({ok, {_, _, GzippedBody}},
                    http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                                     {200, [{<<"content-type">>, <<"text/plain">>}], Body},
-                                    set_opt(auto_compress, true, Opts)))}.
+                                    Opts#{auto_compress => true}))}.
 
 cache_3_transforms_response_range(Opts) ->
     {spawn,
@@ -556,11 +545,11 @@ cache_4_transforms_response_compression(Opts) ->
                        {ok, RespToRevalidate} =
                            http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                                             {200, [{<<"content-type">>, <<"text/plain">>}], Body},
-                                            set_opt(auto_compress, true, Opts)),
+                                            Opts#{auto_compress => true}),
                        http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                                         {304, [{<<"content-type">>, <<"text/plain">>}], <<>>},
                                         RespToRevalidate,
-                                        set_opt(auto_compress, true, Opts))
+                                        Opts#{auto_compress => true})
                    end)}.
 
 cache_4_transforms_response_range(Opts) ->
@@ -629,7 +618,7 @@ rfc9111_section_3_private_absent(Opts) ->
                                      {Status,
                                       [{<<"cache-control">>, <<"private">>}],
                                       <<"Some content">>},
-                                     set_opt(type, private, Opts)))
+                                     Opts#{type => private}))
       || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES]].
 
 rfc9111_section_3_authz_header(Opts) ->
@@ -647,7 +636,7 @@ rfc9111_section_3_authz_header(Opts) ->
                                       [{<<"authorization">>, <<"some-token">>}],
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
-                                     set_opt(type, private, Opts)))
+                                     Opts#{type => private}))
       || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
      [?_assertMatch({ok, _},
                     http_cache:cache({Method,
@@ -693,7 +682,7 @@ rfc9111_section_3_resp_has_smaxage_ccdir(Opts) ->
                                      {Status,
                                       [{<<"cache-control">>, <<"s-maxage=3600">>}],
                                       <<"Some content">>},
-                                     set_opt(type, private, Opts)))
+                                     Opts#{type => private}))
       || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES]].
 
 rfc9111_section_3_resp_has_public_ccdir(Opts) ->
@@ -994,7 +983,7 @@ rfc9111_section_4_2_stale_on_expired(Opts) ->
                    end)}.
 
 rfc9111_section_4_2_1_smaxage_shared(Opts) ->
-    Store = proplists:get_value(store, Opts),
+    Store = map_get(store, Opts),
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1010,8 +999,8 @@ rfc9111_section_4_2_1_smaxage_shared(Opts) ->
     {spawn, ?_assertEqual(unix_now() + 3, F())}.
 
 rfc9111_section_4_2_1_smaxage_private(Opts) ->
-    Store = proplists:get_value(store, Opts),
-    OptsPriv = set_opt(type, private, Opts),
+    Store = map_get(store, Opts),
+    OptsPriv = Opts#{type => private},
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1027,7 +1016,7 @@ rfc9111_section_4_2_1_smaxage_private(Opts) ->
     {spawn, ?_assertEqual(unix_now() + 5, F())}.
 
 rfc9111_section_4_2_1_maxage(Opts) ->
-    Store = proplists:get_value(store, Opts),
+    Store = map_get(store, Opts),
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1043,7 +1032,7 @@ rfc9111_section_4_2_1_maxage(Opts) ->
     {spawn, ?_assertEqual(unix_now() + 5, F())}.
 
 rfc9111_section_4_2_1_expires(Opts) ->
-    Store = proplists:get_value(store, Opts),
+    Store = map_get(store, Opts),
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1058,8 +1047,8 @@ rfc9111_section_4_2_1_expires(Opts) ->
     {spawn, ?_assertEqual(unix_now() + 7, F())}.
 
 rfc9111_section_4_2_2_heuristics_no_used(Opts) ->
-    Store = proplists:get_value(store, Opts),
-    TTL = proplists:get_value(default_ttl, Opts),
+    Store = map_get(store, Opts),
+    TTL = map_get(default_ttl, Opts),
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1129,7 +1118,7 @@ rfc9111_section_4_2_4_no_stale_returned_resp_ccdir_must_revalidate(Opts) ->
     {spawn, ?_assertMatch({must_revalidate, _}, F())}.
 
 rfc9111_section_4_2_4_stale_returned_resp_ccdir_proxy_revalidate_priv_cache(Opts) ->
-    OptsPriv = set_opt(type, private, Opts),
+    OptsPriv = Opts#{type => private},
     F = fun() ->
            Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
            http_cache:cache(Req,
@@ -1350,7 +1339,7 @@ rfc9111_section_4_3_4_cached_response_updated_with_strong_validator_etag(Opts) -
                               {<<"etag">>, <<"\"strong-etag\"">>},
                               {<<"test-header">>, <<"a2">>}],
                              <<"Some content">>},
-                            set_opt(default_ttl, 0, Opts)),
+                            Opts#{default_ttl => 0}),
            http_cache:cache(Req,
                             {304,
                              [{<<"etag">>, <<"\"strong-etag\"">>}, {<<"test-header">>, <<"b">>}],
@@ -1412,7 +1401,7 @@ rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_last_modified(
                             {200,
                              [{<<"last-modified">>, OneMinuteAgo}, {<<"most-recent">>, <<"nope">>}],
                              <<"Some content">>},
-                            set_opt(request_time, unix_now() - 60, Opts)),
+                            Opts#{request_time => unix_now() - 60}),
            http_cache:cache(Req,
                             {200,
                              [{<<"last-modified">>, OneMinuteAgo}, {<<"most-recent">>, <<"yeah">>}],
@@ -1454,7 +1443,7 @@ rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_last_modified_
                               {<<"last-modified">>, OneMinuteAgo},
                               {<<"most-recent">>, <<"nope">>}],
                              <<"Some content">>},
-                            set_opt(request_time, unix_now() - 60, Opts)),
+                            Opts#{request_time => unix_now() - 60}),
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"max-age=0">>},
@@ -1497,12 +1486,12 @@ rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_etag(Opts) ->
                             {200,
                              [{<<"etag">>, <<"W/\"weak-etag\"">>}, {<<"most-recent">>, <<"nope">>}],
                              <<"Some content">>},
-                            set_opt(request_time, unix_now() - 60, Opts)),
+                            Opts#{request_time => unix_now() - 60}),
            http_cache:cache(Req,
                             {200,
                              [{<<"etag">>, <<"W/\"weak-etag\"">>}, {<<"most-recent">>, <<"yeah">>}],
                              <<"Some content">>},
-                            set_opt(request_time, unix_now() - 30, Opts)),
+                            Opts#{request_time => unix_now() - 30}),
            http_cache:cache(Req,
                             {304,
                              [{<<"etag">>, <<"W/\"weak-etag\"">>}, {<<"test-header">>, <<"a">>}],
@@ -1538,14 +1527,14 @@ rfc9111_section_4_3_4_cached_response_updated_with_weak_validator_etag_revalidat
                               {<<"etag">>, <<"W/\"weak-etag\"">>},
                               {<<"most-recent">>, <<"nope">>}],
                              <<"Some content">>},
-                            set_opt(request_time, unix_now() - 60, Opts)),
+                            Opts#{request_time => unix_now() - 60}),
            http_cache:cache(Req,
                             {200,
                              [{<<"cache-control">>, <<"max-age=0">>},
                               {<<"etag">>, <<"W/\"weak-etag\"">>},
                               {<<"most-recent">>, <<"yeah">>}],
                              <<"Some content">>},
-                            set_opt(request_time, unix_now() - 30, Opts)),
+                            Opts#{request_time => unix_now() - 30}),
            {must_revalidate, {_, RespToRevalidate}} = http_cache:get(Req, Opts),
            http_cache:cache(Req,
                             {304,
@@ -2114,7 +2103,7 @@ rfc9111_section_5_2_2_6_ccdir_no_transform_auto_compress(Opts) ->
         {200,
          [{<<"content-type">>, <<"text/plain">>}, {<<"cache-control">>, <<"no-transform">>}],
          <<"Some content">>},
-    Store = fun() -> http_cache:cache(Req, Resp, set_opt(auto_compress, true, Opts)) end,
+    Store = fun() -> http_cache:cache(Req, Resp, Opts#{auto_compress => true}) end,
     [{spawn,
       ?_assertMatch({fresh, {_, {200, _, <<"Some content">>}}},
                     begin
@@ -2123,7 +2112,7 @@ rfc9111_section_5_2_2_6_ccdir_no_transform_auto_compress(Opts) ->
                                         ?TEST_URL,
                                         [{<<"accept-encoding">>, <<"gzip">>}],
                                         <<"">>},
-                                       set_opt(auto_decompress, true, Opts))
+                                       Opts#{auto_decompress => true})
                     end)}].
 
 rfc9111_section_5_2_2_6_ccdir_no_transform_auto_decompress(Opts) ->
@@ -2134,13 +2123,13 @@ rfc9111_section_5_2_2_6_ccdir_no_transform_auto_decompress(Opts) ->
           {<<"cache-control">>, <<"no-transform">>},
           {<<"vary">>, <<"accept-encoding">>}],
          zlib:gzip(<<"Some compressed content">>)},
-    Store = fun() -> http_cache:cache(Req, Resp, set_opt(auto_decompress, true, Opts)) end,
+    Store = fun() -> http_cache:cache(Req, Resp, Opts#{auto_decompress => true}) end,
     [{spawn,
       ?_assertMatch(miss,
                     begin
                         Store(),
                         http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>},
-                                       set_opt(auto_decompress, true, Opts))
+                                       Opts#{auto_decompress => true})
                     end)},
      {spawn,
       ?_assertMatch(miss,
@@ -2150,7 +2139,7 @@ rfc9111_section_5_2_2_6_ccdir_no_transform_auto_decompress(Opts) ->
                                         ?TEST_URL,
                                         [{<<"accept-encoding">>, <<"identity">>}],
                                         <<"">>},
-                                       set_opt(auto_decompress, true, Opts))
+                                       Opts#{auto_decompress => true})
                     end)}].
 
 rfc9111_section_5_2_2_6_ccdir_no_transform_range(Opts) ->
@@ -2185,7 +2174,7 @@ rfc9111_section_5_2_2_9_ccdir_public(Opts) ->
 
 rfc9111_section_5_2_2_7_ccdir_private(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-    PrivOpts = set_opt(type, private, Opts),
+    PrivOpts = Opts#{type => private},
     Store =
         fun(SelectedOpts) ->
            http_cache:cache(Req,
@@ -2207,7 +2196,7 @@ rfc9111_section_5_2_2_7_ccdir_private(Opts) ->
 
 rfc9111_section_5_2_2_7_ccdir_private_qualified_ignored(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-    PrivOpts = set_opt(type, private, Opts),
+    PrivOpts = Opts#{type => private},
     Store =
         fun(SelectedOpts) ->
            http_cache:cache(Req,
@@ -2231,7 +2220,7 @@ rfc9111_section_5_2_2_7_ccdir_private_qualified_ignored(Opts) ->
 
 rfc9111_section_5_2_2_8_ccdir_proxy_revalidate(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"max-stale=5">>}], <<"">>},
-    PrivOpts = set_opt(type, private, Opts),
+    PrivOpts = Opts#{type => private},
     Store =
         fun(SelectedOpts) ->
            http_cache:cache(Req,
@@ -2278,7 +2267,7 @@ rfc9111_section_5_2_2_1_ccdir_max_age(Opts) ->
 
 rfc9111_section_5_2_2_10_ccdir_s_maxage(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-    PrivOpts = set_opt(type, private, Opts),
+    PrivOpts = Opts#{type => private},
     Store =
         fun(MaxAge, SelectedOpts) ->
            http_cache:cache(Req,
@@ -2401,7 +2390,7 @@ rfc5861_stale_while_revalidate_not_expired(Opts) ->
      ?_assertMatch({stale, _},
                    begin
                        Store(),
-                       http_cache:get(Req, [{allow_stale_while_revalidate, true} | Opts])
+                       http_cache:get(Req, Opts#{allow_stale_while_revalidate => true})
                    end)}.
 
 rfc5861_stale_while_revalidate_expired(Opts) ->
@@ -2418,7 +2407,7 @@ rfc5861_stale_while_revalidate_expired(Opts) ->
      ?_assertMatch({must_revalidate, _},
                    begin
                        Store(),
-                       http_cache:get(Req, [{allow_stale_while_revalidate, true} | Opts])
+                       http_cache:get(Req, Opts#{allow_stale_while_revalidate => true})
                    end)}.
 
 rfc5861_stale_if_error_req_not_expired(Opts) ->
@@ -2433,7 +2422,7 @@ rfc5861_stale_if_error_req_not_expired(Opts) ->
      ?_assertMatch({stale, _},
                    begin
                        Store(),
-                       http_cache:get(Req, [{allow_stale_if_error, true} | Opts])
+                       http_cache:get(Req, Opts#{allow_stale_if_error => true})
                    end)}.
 
 rfc5861_stale_if_error_req_expired(Opts) ->
@@ -2448,7 +2437,7 @@ rfc5861_stale_if_error_req_expired(Opts) ->
      ?_assertMatch({must_revalidate, _},
                    begin
                        Store(),
-                       http_cache:get(Req, [{allow_stale_if_error, true} | Opts])
+                       http_cache:get(Req, Opts#{allow_stale_if_error => true})
                    end)}.
 
 rfc5861_stale_if_error_resp_not_expired(Opts) ->
@@ -2465,7 +2454,7 @@ rfc5861_stale_if_error_resp_not_expired(Opts) ->
      ?_assertMatch({stale, _},
                    begin
                        Store(),
-                       http_cache:get(Req, [{allow_stale_if_error, true} | Opts])
+                       http_cache:get(Req, Opts#{allow_stale_if_error => true})
                    end)}.
 
 rfc5861_stale_if_error_resp_expired(Opts) ->
@@ -2482,7 +2471,7 @@ rfc5861_stale_if_error_resp_expired(Opts) ->
      ?_assertMatch({must_revalidate, _},
                    begin
                        Store(),
-                       http_cache:get(Req, [{allow_stale_if_error, true} | Opts])
+                       http_cache:get(Req, Opts#{allow_stale_if_error => true})
                    end)}.
 
 rfc7233_single_byte_range(Opts) ->
@@ -2588,11 +2577,11 @@ rfc7233_no_satisfiable_range_content_range_header(Opts) ->
 
 init() ->
     application:ensure_all_started(telemetry),
-    [{default_ttl, 300},
-     {default_grace, 300},
-     {compression_threshold, 0},
-     {store, http_cache_store_process},
-     {type, shared}].
+    #{default_ttl => 300,
+      default_grace => 300,
+      compression_threshold => 0,
+      store => http_cache_store_process,
+      type => shared}.
 
 rfc7233_range_ignored_not_get(Opts) ->
     F = fun() ->
@@ -2604,7 +2593,7 @@ rfc7233_range_ignored_not_get(Opts) ->
     {spawn, ?_assertMatch({fresh, {_, {200, _, _}}}, begin F() end)}.
 
 rfc7233_error_on_too_many_ranges(Opts) ->
-    OptsRestrict = [{max_ranges, 1} | Opts],
+    OptsRestrict = Opts#{max_ranges => 1},
     F = fun() ->
            http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
                             {200, [], <<"Some content">>},
@@ -2628,11 +2617,8 @@ rfc7233_range_and_accept_encoding(Opts) ->
                                           [{<<"range">>, <<"bytes=5-11">>},
                                            {<<"accept-encoding">>, <<"gzip">>}],
                                           <<"">>},
-                                         set_opt(auto_decompress, true, Opts))
+                                         Opts#{auto_decompress => true})
                       end)}.
-
-set_opt(OptName, OptValue, Opts) ->
-    [{OptName, OptValue} | proplists:delete(OptName, Opts)].
 
 unix_now() ->
     os:system_time(second).
