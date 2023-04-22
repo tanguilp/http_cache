@@ -56,6 +56,7 @@
 -type url_digest() :: binary().
 %% Opaque URL digest as computed by the main module
 -type vary_headers() :: #{binary() := binary() | undefined}.
+
 %% Normalized headers on which the response varies
 
 -callback list_candidates(RequestKey :: request_key(), Opts :: opts()) -> [candidate()].

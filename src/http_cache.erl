@@ -117,10 +117,10 @@
 -module(http_cache).
 
 %% API exports
--export([get/2, notify_response_used/2, cache/3, cache/4, invalidate_url/2,
+-export([get/2, notify_downloading/3, notify_response_used/2, cache/3, cache/4, invalidate_url/2,
          invalidate_by_alternate_key/2]).
 
--export_type([alternate_key/0, headers/0, response/0, status/0, timestamp/0]).
+-export_type([alternate_key/0, headers/0, request/0, response/0, status/0, timestamp/0]).
 
 -include_lib("cowlib/include/cow_inline.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -138,6 +138,7 @@
 %% A header can appear more than once, this is allowed by HTTP
 -type invalidation_result() ::
     {ok, NbInvalidatedResponses :: non_neg_integer() | undefined} | {error, term()}.
+
 %% The invalidation result, with the count of deleted objects if the backend supports it
 %%
 %% `undefined' is returned if the backend does not support counting the number of
@@ -317,6 +318,7 @@
 -type timestamp() :: non_neg_integer().
 %% UNIX timestamp in seconds
 -type type() :: shared | private.
+
 %% Type of the cache: shared (like proxies) or private (like browser cache)
 
 -define(DEFAULT_TTL, 2 * 60).
@@ -545,6 +547,17 @@ transform_response(Request, ParsedReqHeaders, Response0, RespMetadata, Opts) ->
         handle_range_request(Request, ParsedReqHeaders, Response1, RespMetadata, Opts),
     telemetry_stop_measurement(range_time),
     Response2.
+
+%%------------------------------------------------------------------------------
+%% @doc Notifies a response is currently being downloaded
+%%
+%% For future use, does not do anything at the moment.
+%% @end
+%%------------------------------------------------------------------------------
+
+-spec notify_downloading(request(), pid(), opts()) -> ok.
+notify_downloading(_Request, _Pid, _Opts) ->
+    ok.
 
 %%------------------------------------------------------------------------------
 %% @doc Notifies the backend that a response was used
