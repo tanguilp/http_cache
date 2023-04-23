@@ -1907,8 +1907,12 @@ strip_connection_headers([{Name, Value} | Rest]) ->
 %%====================================================================
 
 get_body_content({file, FilePath}) ->
-    {ok, Content} = file:read_file(FilePath),
-    Content;
+    case file:read_file(FilePath) of
+        {ok, Content} ->
+            Content;
+        {error, _} ->
+            throw(resp_body_no_longer_available)
+    end;
 get_body_content(<<_/binary>> = BinBody) ->
     BinBody.
 
