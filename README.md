@@ -68,10 +68,13 @@ miss
 
 ## Store backends
 
-Responses have to be stored in a separate store backend (this library being stateless).
-A suitable backend store for production use is
-[`http_cache_store_native`](https://github.com/tanguilp/http_cache_store_native). It uses
-native BEAM features (ETSes...) and is cluster-aware.
+Responses have to be stored in a separate store backend (this library being stateless), such as:
+- [`http_cache_store_memory`](https://github.com/tanguilp/http_cache_store_memory): it uses
+native BEAM features (ETS)
+- [`http_cache_store_disk`](https://github.com/tanguilp/http_cache_store_disk): it stores responses
+on disk and benefits from the kernel's memory cache for caching in-memory as well
+
+Both are cluster-aware.
 
 ## Header normalisation
 
