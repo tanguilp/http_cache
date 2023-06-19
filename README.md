@@ -69,10 +69,12 @@ miss
 ## Store backends
 
 Responses have to be stored in a separate store backend (this library being stateless), such as:
-- [`http_cache_store_memory`](https://github.com/tanguilp/http_cache_store_memory): it uses
-native BEAM features (ETS)
-- [`http_cache_store_disk`](https://github.com/tanguilp/http_cache_store_disk): it stores responses
-on disk and benefits from the kernel's memory cache for caching in-memory as well
+- [`http_cache_store_memory`](https://github.com/tanguilp/http_cache_store_memory): responses are
+stored in memory (ETS)
+- [`http_cache_store_disk`](https://github.com/tanguilp/http_cache_store_disk): responses are
+stored on disk. An application using the `sendfile` system call (such as
+[`plug_http_cache`](https://github.com/tanguilp/plug_http_cache)) may benefit from the kernel's
+memory caching automatically
 
 Both are cluster-aware.
 
