@@ -290,7 +290,7 @@
 %%    Used by all functions, defaults to `[]'.
 %%  </li>
 %%  <li>
-%%    `type': <b>required</b>, cache type. `shared' or `private'. A CDN is an example of a shared cache. A browser cache
+%%    `type': cache type. `shared' or `private'. A CDN is an example of a shared cache. A browser cache
 %%    is an example of a private cache.
 %%    Used by {@link get/2}, {@link cache/3} and {@link cache/4}. Defaults to `shared'.
 %%  </li>
