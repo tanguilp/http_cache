@@ -164,7 +164,7 @@
       ignore_query_params_order => boolean(),
       max_ranges => non_neg_integer(),
       request_time => non_neg_integer(),
-      store_opts => http_cache_store:opts(),
+      store_opts => http_cache_store_behaviour:opts(),
       type => type()}.
 %% Options passed to the functions of this module
 %%
@@ -393,10 +393,10 @@
 %%
 %% The function returns one of:
 %% <ul>
-%%    <li>`{fresh, {http_cache_store:response_ref(), response()}}':
+%%    <li>`{fresh, {http_cache_store_behaviour:response_ref(), response()}}':
 %%    the response is fresh and can be returned directly to the client.
 %%    </li>
-%%    <li>`{stale, {http_cache_store:response_ref(), response()}}':
+%%    <li>`{stale, {http_cache_store_behaviour:response_ref(), response()}}':
 %%    the response is stale but can be directly returned to the client.
 %%
 %%    Stale responses that are cached but cannot be returned do to
@@ -411,7 +411,7 @@
 %%        <li>`origin_unreachable'</li>
 %%      </ul>
 %%    </li>
-%%    <li>`{must_revalidate, {http_cache_store:response_ref(), response()}}':
+%%    <li>`{must_revalidate, {http_cache_store_behaviour:response_ref(), response()}}':
 %%    the response must be revalidated.
 %%    </li>
 %%    <li>`miss': no suitable response was found. </li>
@@ -425,9 +425,9 @@
 %%------------------------------------------------------------------------------
 
 -spec get(request(), opts()) ->
-             {fresh, {http_cache_store:response_ref(), response()}} |
-             {stale, {http_cache_store:response_ref(), response()}} |
-             {must_revalidate, {http_cache_store:response_ref(), response()}} |
+             {fresh, {http_cache_store_behaviour:response_ref(), response()}} |
+             {stale, {http_cache_store_behaviour:response_ref(), response()}} |
+             {must_revalidate, {http_cache_store_behaviour:response_ref(), response()}} |
              miss.
 get(Request, Opts) ->
     try
@@ -565,7 +565,7 @@ notify_downloading(_Request, _Pid, _Opts) ->
 %% last used time) when a response is used.
 %% @end
 %%------------------------------------------------------------------------------
--spec notify_response_used(http_cache_store:response_ref(), opts()) ->
+-spec notify_response_used(http_cache_store_behaviour:response_ref(), opts()) ->
                               ok | {error, term()}.
 notify_response_used(RespRef, Opts) ->
     #{store := Store, store_opts := StoreOpts} = init_opts(Opts),

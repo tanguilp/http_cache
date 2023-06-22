@@ -12,7 +12,7 @@
 
 -module(http_cache_store_process).
 
--behaviour(http_cache_store).
+-behaviour(http_cache_store_behaviour).
 
 -export([list_candidates/2, get_response/2, put/6, invalidate_url/2,
          invalidate_by_alternate_key/2, notify_response_used/2, save_in_file/0]).
