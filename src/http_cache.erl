@@ -349,6 +349,7 @@
 -define(KV_HEADERS, #{<<"accept-encoding">> => [], <<"cache-control">> => []}).
 -define(RESP_HEADERS_TO_DELETE,
         #{<<"connection">> => [],
+          <<"proxy-authenticate">> => [],
           <<"proxy-connection">> => [],
           <<"keep-alive">> => [],
           <<"transfer-encoding">> => [],
