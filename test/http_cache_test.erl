@@ -6,12 +6,12 @@
 -define(TEST_URL, <<"https://www.example.com">>).
 -define(CACHEABLE_METHODS, [<<"HEAD">>, <<"GET">>]).
 % source: http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
--define(ALL_STATUSES,
-        [101, 102, 103, 200, 201, 202, 203, 204, 205, 207, 208, 226, 300, 301, 302, 303, 305, 307,
-         308, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416,
-         417, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451, 500, 501, 502, 503, 504, 505, 506,
-         507, 508, 510, 511]).
--define(DEFAULT_CACHEABLE_STATUSES,
+-define(FINAL_STATUSES,
+        [200, 201, 202, 203, 204, 205, 207, 208, 226, 300, 301, 302, 303, 305, 307, 308, 400, 401,
+         402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 421, 422,
+         423, 424, 425, 426, 428, 429, 431, 451, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510,
+         511]).
+-define(HEURISTICALLY_CACHEABLE_STATUSES,
         [200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 451, 501]).
 
 http_cache_test_() ->
@@ -28,9 +28,10 @@ http_cache_test_() ->
       fun invalidate_by_alternate_keys/1, fun response_stored_in_file_by_backend/1,
       fun cache_3_transforms_response_compression/1, fun cache_3_transforms_response_range/1,
       fun cache_4_transforms_response_compression/1, fun cache_4_transforms_response_range/1,
-      fun rfc9111_section_3_method_cacheable/1, fun rfc9111_section_3_nostore_absent/1,
-      fun rfc9111_section_3_private_absent/1, fun rfc9111_section_3_authz_header/1,
-      fun rfc9111_section_3_resp_has_expires_ccdir/1,
+      fun rfc9111_section_3_method_cacheable/1,
+      fun rfc9111_section_3_discard_non_final_statuses/1,
+      fun rfc9111_section_3_nostore_absent/1, fun rfc9111_section_3_private_absent/1,
+      fun rfc9111_section_3_authz_header/1, fun rfc9111_section_3_resp_has_expires_ccdir/1,
       fun rfc9111_section_3_resp_has_maxage_ccdir/1,
       fun rfc9111_section_3_resp_has_smaxage_ccdir/1,
       fun rfc9111_section_3_resp_has_public_ccdir/1,
@@ -577,7 +578,7 @@ rfc9111_section_3_method_cacheable(Opts) ->
                    http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                     {Status, [], <<"Some content">>},
                                     Opts))
-     || Method <- [<<"HEAD">>, <<"GET">>], Status <- ?DEFAULT_CACHEABLE_STATUSES]
+     || Method <- [<<"HEAD">>, <<"GET">>], Status <- ?HEURISTICALLY_CACHEABLE_STATUSES]
     ++ [?_assertMatch({ok, _},
                       http_cache:cache({<<"POST">>, ?TEST_URL, [], <<"">>},
                                        {Status, [CacheHeader], <<"Some content">>},
@@ -586,7 +587,16 @@ rfc9111_section_3_method_cacheable(Opts) ->
                <- [{<<"cache-control">>, <<"s-maxage=3600">>},
                    {<<"cache-control">>, <<"max-age=3600">>},
                    {<<"expires">>, timestamp_to_rfc7231(unix_now() + 3600)}],
-           Status <- ?DEFAULT_CACHEABLE_STATUSES].
+           Status <- ?HEURISTICALLY_CACHEABLE_STATUSES].
+
+rfc9111_section_3_discard_non_final_statuses(Opts) ->
+    [?_assertMatch(not_cacheable,
+                   http_cache:cache({Method, ?TEST_URL, [], <<"">>},
+                                    {Status,
+                                     [{<<"cache-control">>, <<"max-age=120">>}],
+                                     <<"Some content">>},
+                                    Opts))
+     || Method <- [<<"HEAD">>, <<"GET">>], Status <- lists:seq(100, 199)].
 
 rfc9111_section_3_nostore_absent(Opts) ->
     [[?_assertMatch(not_cacheable,
@@ -596,14 +606,14 @@ rfc9111_section_3_nostore_absent(Opts) ->
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
                                      Opts))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
+      || Method <- ?CACHEABLE_METHODS, Status <- ?HEURISTICALLY_CACHEABLE_STATUSES],
      [?_assertMatch(not_cacheable,
                     http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
                                       [{<<"cache-control">>, <<"no-store">>}],
                                       <<"Some content">>},
                                      Opts))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES]].
+      || Method <- ?CACHEABLE_METHODS, Status <- ?HEURISTICALLY_CACHEABLE_STATUSES]].
 
 rfc9111_section_3_private_absent(Opts) ->
     [[?_assertMatch(not_cacheable,
@@ -612,14 +622,14 @@ rfc9111_section_3_private_absent(Opts) ->
                                       [{<<"cache-control">>, <<"private">>}],
                                       <<"Some content">>},
                                      Opts))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
+      || Method <- ?CACHEABLE_METHODS, Status <- ?HEURISTICALLY_CACHEABLE_STATUSES],
      [?_assertMatch({ok, _},
                     http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
                                       [{<<"cache-control">>, <<"private">>}],
                                       <<"Some content">>},
                                      Opts#{type => private}))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES]].
+      || Method <- ?CACHEABLE_METHODS, Status <- ?HEURISTICALLY_CACHEABLE_STATUSES]].
 
 rfc9111_section_3_authz_header(Opts) ->
     [[?_assertMatch(not_cacheable,
@@ -629,7 +639,7 @@ rfc9111_section_3_authz_header(Opts) ->
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
                                      Opts))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
+      || Method <- ?CACHEABLE_METHODS, Status <- ?HEURISTICALLY_CACHEABLE_STATUSES],
      [?_assertMatch({ok, _},
                     http_cache:cache({Method,
                                       ?TEST_URL,
@@ -637,7 +647,7 @@ rfc9111_section_3_authz_header(Opts) ->
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
                                      Opts#{type => private}))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?DEFAULT_CACHEABLE_STATUSES],
+      || Method <- ?CACHEABLE_METHODS, Status <- ?HEURISTICALLY_CACHEABLE_STATUSES],
      [?_assertMatch({ok, _},
                     http_cache:cache({Method,
                                       ?TEST_URL,
@@ -648,7 +658,7 @@ rfc9111_section_3_authz_header(Opts) ->
                                       <<"Some content">>},
                                      Opts))
       || Method <- ?CACHEABLE_METHODS,
-         Status <- ?DEFAULT_CACHEABLE_STATUSES,
+         Status <- ?HEURISTICALLY_CACHEABLE_STATUSES,
          CacheControlOpt <- [<<"must-revalidate">>, <<"public">>, <<"s-maxage=3600">>]]].
 
 rfc9111_section_3_resp_has_expires_ccdir(Opts) ->
@@ -658,7 +668,8 @@ rfc9111_section_3_resp_has_expires_ccdir(Opts) ->
                                      [{<<"expires">>, timestamp_to_rfc7231(unix_now() + 3600)}],
                                      <<"Some content">>},
                                     Opts))
-     || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES].
+     || Method <- ?CACHEABLE_METHODS,
+        Status <- ?FINAL_STATUSES -- ?HEURISTICALLY_CACHEABLE_STATUSES].
 
 rfc9111_section_3_resp_has_maxage_ccdir(Opts) ->
     [?_assertMatch({ok, _},
@@ -667,7 +678,8 @@ rfc9111_section_3_resp_has_maxage_ccdir(Opts) ->
                                      [{<<"cache-control">>, <<"max-age=3600">>}],
                                      <<"Some content">>},
                                     Opts))
-     || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES].
+     || Method <- ?CACHEABLE_METHODS,
+        Status <- ?FINAL_STATUSES -- ?HEURISTICALLY_CACHEABLE_STATUSES].
 
 rfc9111_section_3_resp_has_smaxage_ccdir(Opts) ->
     [[?_assertMatch({ok, _},
@@ -676,14 +688,16 @@ rfc9111_section_3_resp_has_smaxage_ccdir(Opts) ->
                                       [{<<"cache-control">>, <<"s-maxage=3600">>}],
                                       <<"Some content">>},
                                      Opts))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES],
+      || Method <- ?CACHEABLE_METHODS,
+         Status <- ?FINAL_STATUSES -- ?HEURISTICALLY_CACHEABLE_STATUSES],
      [?_assertMatch(not_cacheable,
                     http_cache:cache({Method, ?TEST_URL, [], <<"">>},
                                      {Status,
                                       [{<<"cache-control">>, <<"s-maxage=3600">>}],
                                       <<"Some content">>},
                                      Opts#{type => private}))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES]].
+      || Method <- ?CACHEABLE_METHODS,
+         Status <- ?FINAL_STATUSES -- ?HEURISTICALLY_CACHEABLE_STATUSES]].
 
 rfc9111_section_3_resp_has_public_ccdir(Opts) ->
     [?_assertMatch({ok, _},
@@ -692,7 +706,8 @@ rfc9111_section_3_resp_has_public_ccdir(Opts) ->
                                      [{<<"cache-control">>, <<"public">>}],
                                      <<"Some content">>},
                                     Opts))
-     || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES -- ?DEFAULT_CACHEABLE_STATUSES].
+     || Method <- ?CACHEABLE_METHODS,
+        Status <- ?FINAL_STATUSES -- ?HEURISTICALLY_CACHEABLE_STATUSES].
 
 rfc9111_section_3_1_discard_connection_headers(Opts) ->
     {spawn,
@@ -733,7 +748,7 @@ rfc9111_section_3_2_authorization_header_caching(Opts) ->
                                       <<"">>},
                                      {Status, [], <<"Some content">>},
                                      Opts))
-      || Method <- ?CACHEABLE_METHODS, Status <- ?ALL_STATUSES],
+      || Method <- ?CACHEABLE_METHODS, Status <- ?FINAL_STATUSES],
      [?_assertMatch({ok, _},
                     http_cache:cache({Method,
                                       ?TEST_URL,
@@ -744,7 +759,7 @@ rfc9111_section_3_2_authorization_header_caching(Opts) ->
                                       <<"Some content">>},
                                      Opts))
       || Method <- ?CACHEABLE_METHODS,
-         Status <- ?DEFAULT_CACHEABLE_STATUSES,
+         Status <- ?HEURISTICALLY_CACHEABLE_STATUSES,
          CacheControlOpt <- [<<"must-revalidate">>, <<"public">>, <<"s-maxage=3600">>]]].
 
 rfc9111_section_4_req_nocache_ccdir(Opts) ->
@@ -1865,7 +1880,7 @@ rfc9111_section_4_4_invalidate_uri_of_unsafe_method_on_non_error_status(Opts) ->
      || RespHeaders
             <- [[], [{<<"location">>, OtherURI}], [{<<"content-location">>, OtherURI}]],
         UnsafeMethod <- [<<"PUT">>, <<"POST">>, <<"PATCH">>, <<"DELETE">>, <<"UNKNOWN">>],
-        SuccessStatus <- [Status || Status <- ?ALL_STATUSES, Status >= 200, Status < 400]].
+        SuccessStatus <- [Status || Status <- ?FINAL_STATUSES, Status >= 200, Status < 400]].
 
 rfc9111_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status(Opts) ->
     URI = ?TEST_URL,
@@ -1888,7 +1903,7 @@ rfc9111_section_4_4_no_invalidate_uri_of_unsafe_method_on_error_status(Opts) ->
      || RespHeaders
             <- [[], [{<<"location">>, OtherURI}], [{<<"content-location">>, OtherURI}]],
         UnsafeMethod <- [<<"PUT">>, <<"POST">>, <<"PATCH">>, <<"DELETE">>, <<"UNKNOWN">>],
-        SuccessStatus <- [Status || Status <- ?ALL_STATUSES, Status > 400]].
+        SuccessStatus <- [Status || Status <- ?FINAL_STATUSES, Status > 400]].
 
 rfc9111_section_5_2_1_1_ccdir_max_age(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},

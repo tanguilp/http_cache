@@ -1234,7 +1234,7 @@ request_method_cacheable(<<"POST">>, #{<<"expires">> := _}, _) ->
 request_method_cacheable(_, _, _) ->
     false.
 
-response_status_is_final(100) ->
+response_status_is_final(Status) when Status >= 100, Status < 200 ->
     false;
 response_status_is_final(_) ->
     true.
