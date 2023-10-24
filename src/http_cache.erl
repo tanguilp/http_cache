@@ -1430,7 +1430,7 @@ handle_range_request({<<"GET">>, _, _, _},
                            #{<<"last-modified">> := LastModified, <<"date">> := Date}},
                      _Opts)
     when is_integer(IfUnmodifiedSince)
-         andalso not (Date - LastModified >= 60 andalso LastModified =< IfUnmodifiedSince) ->
+         andalso not (Date - LastModified >= 1 andalso LastModified =< IfUnmodifiedSince) ->
     Response;
 handle_range_request({<<"GET">>, _, _, _},
                      #{<<"range">> := {bytes, _}, <<"if-range">> := IfUnmodifiedSince},

@@ -1316,8 +1316,7 @@ rfc9111_section_4_3_2_if_range_with_etag(Opts) ->
                     F([{<<"if-range">>, <<"W/\"some-etag\"">>}], []))}].
 
 rfc9111_section_4_3_2_if_range_with_date(Opts) ->
-    OneAndAHalfMinuteAgo = timestamp_to_rfc7231(unix_now() - 90),
-    HalfMinuteAgo = timestamp_to_rfc7231(unix_now() - 30),
+    TenSecondsAgo = timestamp_to_rfc7231(unix_now() - 10),
     Now = timestamp_to_rfc7231(unix_now()),
     F = fun(ReqHeaders, RespHeaders) ->
            http_cache:cache({<<"GET">>, ?TEST_URL, [], <<>>},
@@ -1332,14 +1331,14 @@ rfc9111_section_4_3_2_if_range_with_date(Opts) ->
     [{spawn,
       ?_assertMatch({fresh, {_, {206, _, _}}},
                     F([{<<"if-range">>, Now}],
-                      [{<<"last-modified">>, OneAndAHalfMinuteAgo}, {<<"date">>, Now}]))},
+                      [{<<"last-modified">>, TenSecondsAgo}, {<<"date">>, Now}]))},
      {spawn,
       ?_assertMatch({fresh, {_, {200, _, _}}},
                     F([{<<"if-range">>, Now}],
-                      [{<<"last-modified">>, HalfMinuteAgo}, {<<"date">>, Now}]))},
+                      [{<<"last-modified">>, Now}, {<<"date">>, Now}]))},
      {spawn,
       ?_assertMatch({fresh, {_, {200, _, _}}},
-                    F([{<<"if-range">>, Now}], [{<<"last-modified">>, HalfMinuteAgo}]))},
+                    F([{<<"if-range">>, Now}], [{<<"last-modified">>, TenSecondsAgo}]))},
      {spawn,
       ?_assertMatch({fresh, {_, {200, _, _}}},
                     F([{<<"if-range">>, Now}], [{<<"date">>, Now}]))},
