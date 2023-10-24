@@ -155,6 +155,7 @@
       allow_stale_if_error => boolean(),
       auto_accept_encoding => boolean(),
       auto_compress => boolean(),
+      auto_compress_mime_types => [binary()],
       auto_decompress => boolean(),
       bucket => term(),
       compression_threshold => non_neg_integer(),
@@ -1847,9 +1848,18 @@ set_csl_header_value(TargetHeader, Value, [], Acc) ->
 set_csl_header_value(TargetHeader, Value, [{HeaderName, HeaderValue} | Rest], Acc) ->
     case ?LOWER(HeaderName) of
         TargetHeader ->
-            lists:reverse(Acc)
-            ++ [{HeaderName, <<HeaderValue/binary, ", ", Value/binary>>}]
-            ++ Rest;
+            Values =
+                [string:lowercase(
+                     string:trim(Varying))
+                 || Varying <- binary:split(HeaderValue, <<",">>, [global, trim_all])],
+            case lists:member(HeaderValue, Values) of
+                true ->
+                    lists:reverse(Acc) ++ [{HeaderName, HeaderValue}] ++ Rest;
+                false ->
+                    lists:reverse(Acc)
+                    ++ [{HeaderName, <<HeaderValue/binary, ", ", Value/binary>>}]
+                    ++ Rest
+            end;
         _ ->
             set_csl_header_value(TargetHeader, Value, Rest, [{HeaderName, HeaderValue} | Acc])
     end.

@@ -22,13 +22,13 @@ http_cache_test_() ->
       fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
       fun opt_auto_decompress_multiple_content_encodings/1,
       fun opt_auto_decompress_when_body_is_a_file/1, fun opt_auto_decompress_strong_etags/1,
-      fun opt_compression_threshold/1, fun opt_bucket/1, fun opt_origin_unreachable/1,
-      fun opt_default_ttl/1, fun opt_ignore_query_params_order/1, fun opt_type/1,
-      fun opt_request_time/1, fun invalidate_url/1, fun invalidate_by_alternate_key/1,
-      fun invalidate_by_alternate_keys/1, fun response_stored_in_file_by_backend/1,
-      fun cache_3_transforms_response_compression/1, fun cache_3_transforms_response_range/1,
-      fun cache_4_transforms_response_compression/1, fun cache_4_transforms_response_range/1,
-      fun rfc9111_section_3_method_cacheable/1,
+      fun opt_compression_threshold/1, fun opt_auto_compress_nodup_vary/1, fun opt_bucket/1,
+      fun opt_origin_unreachable/1, fun opt_default_ttl/1, fun opt_ignore_query_params_order/1,
+      fun opt_type/1, fun opt_request_time/1, fun invalidate_url/1,
+      fun invalidate_by_alternate_key/1, fun invalidate_by_alternate_keys/1,
+      fun response_stored_in_file_by_backend/1, fun cache_3_transforms_response_compression/1,
+      fun cache_3_transforms_response_range/1, fun cache_4_transforms_response_compression/1,
+      fun cache_4_transforms_response_range/1, fun rfc9111_section_3_method_cacheable/1,
       fun rfc9111_section_3_discard_non_final_statuses/1,
       fun rfc9111_section_3_nostore_absent/1, fun rfc9111_section_3_private_absent/1,
       fun rfc9111_section_3_authz_header/1, fun rfc9111_section_3_resp_has_expires_ccdir/1,
@@ -346,6 +346,20 @@ opt_compression_threshold(Opts) ->
         end,
     [{spawn, ?_assertMatch({ok, {_, _, GzippedBody}}, F(0))},
      {spawn, ?_assertMatch({ok, {_, _, Body}}, F(1000))}].
+
+opt_auto_compress_nodup_vary(Opts) ->
+    F = fun() ->
+           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                            {200,
+                             [{<<"content-type">>, <<"text/plain; charset=utf-8">>},
+                              {<<"vary">>, <<"accept-encoding">>}],
+                             <<"Some content">>},
+                            Opts#{auto_compress => true}),
+           {fresh, {_, {200, RespHeaders, _}}} =
+               http_cache:get({<<"GET">>, ?TEST_URL, [], <<"">>}, Opts#{auto_compress => true}),
+           proplists:get_value(<<"vary">>, RespHeaders)
+        end,
+    [{spawn, ?_assertEqual([<<"accept-encoding">>], cow_http_hd:parse_vary(F()))}].
 
 opt_bucket(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
