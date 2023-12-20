@@ -163,6 +163,7 @@
       default_grace => non_neg_integer(),
       ignore_query_params_order => boolean(),
       max_ranges => non_neg_integer(),
+      prevent_set_cookie => auto | boolean(),
       request_time => non_neg_integer(),
       store_opts => http_cache_store_behaviour:opts(),
       type => type()}.
@@ -282,6 +283,12 @@
 %%    Used by {@link get/2}. Defaults to `100'.
 %%  </li>
 %%  <li>
+%%    `prevent_set_cookie': when set to `auto', raises when the `set-cookie' is used on shared
+%%    caches. When set to `true', always raises in this case. When set to `false', never raises
+%%    even for shared caches.
+%%    Used by {@link cache/3} and {@link cache/4}. Defaults to `auto'.
+%%  </li>
+%%  <li>
 %%    `store': <b>required</b>, the store backend's module name.
 %%    Used by all functions, no defaults.
 %%  </li>
@@ -368,6 +375,7 @@
           default_grace => ?DEFAULT_GRACE,
           ignore_query_params_order => false,
           max_ranges => 100,
+          prevent_set_cookie => auto,
           store_opts => [],
           type => shared}).
 -define(PDICT_MEASUREMENTS, http_cache_measurments).
@@ -597,9 +605,11 @@ notify_response_used(RespRef, Opts) ->
 %%------------------------------------------------------------------------------
 
 -spec cache(request(), response(), opts()) -> {ok, response()} | not_cacheable.
-cache(Request, Response, Opts) ->
+cache(Request, {_, RespHeaders, _} = Response, Opts) ->
     telemetry_start_measurement(total_time),
-    Result = do_cache(Request, Response, init_opts(Opts)),
+    NormOpts = init_opts(Opts),
+    check_set_cookie(RespHeaders, NormOpts),
+    Result = do_cache(Request, Response, NormOpts),
     telemetry_stop_measurement(total_time),
     telemetry_send_event(?TELEMETRY_CACHE_EVT),
     Result.
@@ -648,6 +658,7 @@ do_cache(Request,
          {304, RespHeaders, _} = Response,
          {Status, RevalidatedRespHeaders, RespBody},
          NormOpts) ->
+    check_set_cookie(RespHeaders, NormOpts),
     refresh_stored_responses(Request, Response, NormOpts),
     UpdatedHeaders = update_headers(RevalidatedRespHeaders, RespHeaders),
     {ok, {Status, UpdatedHeaders, RespBody}};
@@ -1341,6 +1352,20 @@ grace(Expires, #{default_grace := Grace}) ->
 
 cache_type(#{type := Type}) ->
     Type.
+
+check_set_cookie(_, #{prevent_set_cookie := false}) ->
+    ok;
+check_set_cookie(_, #{prevent_set_cookie := auto, type := private}) ->
+    ok;
+check_set_cookie([], _Opts) ->
+    ok;
+check_set_cookie([{HeaderName, _} | Rest], Opts) ->
+    case ?LOWER(HeaderName) of
+        <<"set-cookie">> ->
+            error(set_cookie_header_forbidden);
+        _ ->
+            check_set_cookie(Rest, Opts)
+    end.
 
 %%====================================================================
 %% Internal functions related to compression
