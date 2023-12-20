@@ -163,6 +163,7 @@
       default_grace => non_neg_integer(),
       ignore_query_params_order => boolean(),
       max_ranges => non_neg_integer(),
+      prevent_set_cookie => auto | boolean(),
       request_time => non_neg_integer(),
       store_opts => http_cache_store_behaviour:opts(),
       type => type()}.
