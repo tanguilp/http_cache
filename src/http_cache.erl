@@ -705,7 +705,7 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
             end
     end.
 
-do_cache({Method, Url, ReqHeaders0, ReqBody},
+do_cache({Method, Url, ReqHeaders0, ReqBody} = Request,
          ParsedReqHeaders0,
          {Status, RespHeaders0, RespBody},
          #{<<"content-type">> := {MainType, SubType, _}} = ParsedRespHeaders0,
@@ -731,11 +731,18 @@ do_cache({Method, Url, ReqHeaders0, ReqBody},
     GzippedBody = zlib:gzip(RespBody),
     telemetry_stop_measurement(compress_time),
     telemetry:execute(?TELEMETRY_COMPRESS_EVT, #{}, #{alg => gzip}),
-    do_cache({Method, Url, ReqHeaders, ReqBody},
-             ParsedReqHeaders,
-             {Status, RespHeaders, GzippedBody},
-             ParsedRespHeaders,
-             Opts);
+    {ok, Response} =
+        do_cache({Method, Url, ReqHeaders, ReqBody},
+                 ParsedReqHeaders,
+                 {Status, RespHeaders, GzippedBody},
+                 ParsedRespHeaders,
+                 Opts),
+    RespMetadata = response_metadata(ParsedRespHeaders, Opts),
+    ParsedReqHeadersFinal =
+        maps:merge(ParsedReqHeaders0, parse_headers(ReqHeaders0, [<<"accept-encoding">>])),
+    TransformedResponse =
+        transform_response(Request, ParsedReqHeadersFinal, Response, RespMetadata, Opts),
+    {ok, TransformedResponse};
 do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
          ParsedReqHeaders,
          {Status, RespHeaders0, RespBody0},
@@ -751,28 +758,9 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
     RespHeaders2 = strip_connection_headers(RespHeaders1),
     RequestKey = request_key(Request, Opts),
     VaryHeaders = vary_headers(ReqHeaders0, ParsedRespHeaders),
-    MaybeAge = maps:get(<<"age">>, ParsedRespHeaders, undefined),
-    MaybeDate = maps:get(<<"date">>, ParsedRespHeaders, undefined),
-    CreatedAt = created_at(MaybeAge, MaybeDate, Opts),
-    {TTLSetBy, Expires} = expires(CreatedAt, MaybeDate, ParsedRespHeaders, Opts),
     UrlDigest = url_digest(Url, Opts),
     Response = {Status, RespHeaders2, RespBodyBin},
-    RespMetadata =
-        #{created => CreatedAt,
-          expires => Expires,
-          grace => grace(Expires, Opts),
-          ttl_set_by => TTLSetBy,
-          % For more efficiency, we store only headers we might need when getting responses
-          parsed_headers =>
-              maps:with([<<"cache-control">>,
-                         <<"content-encoding">>,
-                         <<"content-type">>,
-                         <<"date">>,
-                         <<"etag">>,
-                         <<"last-modified">>,
-                         <<"pragma">>],
-                        ParsedRespHeaders),
-          alternate_keys => map_get(alternate_keys, Opts)},
+    RespMetadata = response_metadata(ParsedRespHeaders, Opts),
     telemetry_stop_measurement(analysis_time),
     telemetry_start_measurement(store_save_time),
     StoreRes =
@@ -782,6 +770,27 @@ do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
     TransformedResponse =
         transform_response(Request, ParsedReqHeaders, Response, RespMetadata, Opts),
     {ok, TransformedResponse}.
+
+response_metadata(ParsedRespHeaders, Opts) ->
+    MaybeAge = maps:get(<<"age">>, ParsedRespHeaders, undefined),
+    MaybeDate = maps:get(<<"date">>, ParsedRespHeaders, undefined),
+    CreatedAt = created_at(MaybeAge, MaybeDate, Opts),
+    {TTLSetBy, Expires} = expires(CreatedAt, MaybeDate, ParsedRespHeaders, Opts),
+    #{created => CreatedAt,
+      expires => Expires,
+      grace => grace(Expires, Opts),
+      ttl_set_by => TTLSetBy,
+      % For more efficiency, we store only headers we might need when getting responses
+      parsed_headers =>
+          maps:with([<<"cache-control">>,
+                     <<"content-encoding">>,
+                     <<"content-type">>,
+                     <<"date">>,
+                     <<"etag">>,
+                     <<"last-modified">>,
+                     <<"pragma">>],
+                    ParsedRespHeaders),
+      alternate_keys => map_get(alternate_keys, Opts)}.
 
 %%------------------------------------------------------------------------------
 %% @doc Invalidates all responses for a URL

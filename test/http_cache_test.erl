@@ -343,7 +343,7 @@ opt_compression_threshold(Opts) ->
     Body = <<"Some content">>,
     GzippedBody = zlib:gzip(Body),
     F = fun(Threshold) ->
-           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+           http_cache:cache({<<"GET">>, ?TEST_URL, [{<<"accept-encoding">>, <<"gzip">>}], <<"">>},
                             {200, [{<<"content-type">>, <<"text/plain">>}], Body},
                             Opts#{compression_threshold => Threshold, auto_compress => true})
         end,
@@ -560,11 +560,19 @@ response_stored_in_file_by_backend(Opts) ->
 cache_3_transforms_response_compression(Opts) ->
     Body = <<"Some content">>,
     GzippedBody = zlib:gzip(Body),
-    {spawn,
-     ?_assertMatch({ok, {_, _, GzippedBody}},
-                   http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
-                                    {200, [{<<"content-type">>, <<"text/plain">>}], Body},
-                                    Opts#{auto_compress => true}))}.
+    [{spawn,
+      ?_assertMatch({ok, {_, _, Body}},
+                    http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                                     {200, [{<<"content-type">>, <<"text/plain">>}], Body},
+                                     Opts#{auto_compress => true}))},
+     {spawn,
+      ?_assertMatch({ok, {_, _, GzippedBody}},
+                    http_cache:cache({<<"GET">>,
+                                      ?TEST_URL,
+                                      [{<<"accept-encoding">>, <<"gzip">>}],
+                                      <<"">>},
+                                     {200, [{<<"content-type">>, <<"text/plain">>}], Body},
+                                     Opts#{auto_compress => true}))}].
 
 cache_3_transforms_response_range(Opts) ->
     {spawn,
@@ -583,10 +591,16 @@ cache_4_transforms_response_compression(Opts) ->
      ?_assertMatch({ok, {200, _, GzippedBody}},
                    begin
                        {ok, RespToRevalidate} =
-                           http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                           http_cache:cache({<<"GET">>,
+                                             ?TEST_URL,
+                                             [{<<"accept-encoding">>, <<"gzip">>}],
+                                             <<"">>},
                                             {200, [{<<"content-type">>, <<"text/plain">>}], Body},
                                             Opts#{auto_compress => true}),
-                       http_cache:cache({<<"GET">>, ?TEST_URL, [], <<"">>},
+                       http_cache:cache({<<"GET">>,
+                                         ?TEST_URL,
+                                         [{<<"accept-encoding">>, <<"gzip">>}],
+                                         <<"">>},
                                         {304, [{<<"content-type">>, <<"text/plain">>}], <<>>},
                                         RespToRevalidate,
                                         Opts#{auto_compress => true})
