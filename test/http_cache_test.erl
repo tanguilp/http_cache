@@ -2438,7 +2438,7 @@ rfc5861_stale_if_error_req_not_expired(Opts) ->
                             Opts)
         end,
     [{spawn,
-      ?_assertMatch({not_cacheable, {200, _, <<"Some content">>}},
+      ?_assertMatch({not_cacheable, {_, {200, _, <<"Some content">>}}},
                     begin
                         Store(),
                         http_cache:cache(Req, {ErrorStatus, [], <<>>}, Opts)
@@ -2472,7 +2472,7 @@ rfc5861_stale_if_error_resp_not_expired(Opts) ->
                             Opts)
         end,
     [{spawn,
-      ?_assertMatch({not_cacheable, {200, _, <<"Some content">>}},
+      ?_assertMatch({not_cacheable, {_, {200, _, <<"Some content">>}}},
                     begin
                         Store(),
                         http_cache:cache(Req, {ErrorStatus, [], <<>>}, Opts)

@@ -578,12 +578,15 @@ notify_response_used(RespRef, Opts) ->
 %% and it will be returned as a range response if the request is a range
 %% request and the backend doesn't support it and returned a full response.
 %%
-%% `{not_cacheable, response()}' is returned when the response in parameters:
+%% `{not_cacheable, {response_ref(), response()}}' is returned when the response in parameters:
 %% <ul>
 %%   <li>has a `500', `502', `503' or `504' error status</li>
 %%   <li>is not cacheable (e.g. it has no explicit `max-age' cache-control directive)</li>
 %%   <li>a response observing the `stale-if-error' cache control directive has been found</li>
 %% </ul>
+%%
+%% That is, this function looks up for a stale response automatically as documented by
+%% [https://datatracker.ietf.org/doc/html/rfc5861#section-4].
 %%
 %% This function shall be called with any response, even those known to be not
 %% cacheable, such as `DELETE' requests, because such non-cacheable request
@@ -596,7 +599,9 @@ notify_response_used(RespRef, Opts) ->
 %%------------------------------------------------------------------------------
 
 -spec cache(request(), response(), opts()) ->
-               {ok, response()} | {not_cacheable, response()} | not_cacheable.
+               {ok, response()} |
+               {not_cacheable, {http_cache_store_behaviour:response_ref(), response()}} |
+               not_cacheable.
 cache(Request, {_, RespHeaders, _} = Response, Opts) ->
     telemetry_start_measurement(total_time),
     NormOpts = init_opts(Opts),
@@ -638,7 +643,9 @@ do_cache(Request, Response, NormOpts) ->
             Response :: response(),
             RevalidatedResponse :: response(),
             opts()) ->
-               {ok, response()} | {not_cacheable, response()} | not_cacheable.
+               {ok, response()} |
+               {not_cacheable, {http_cache_store_behaviour:response_ref(), response()}} |
+               not_cacheable.
 cache(Request, Response, RevalidatedResponse, Opts) ->
     telemetry_start_measurement(total_time),
     Result = do_cache(Request, Response, RevalidatedResponse, init_opts(Opts)),
@@ -700,10 +707,10 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
 handle_stale_if_error(Request, {Status, _, _}, Opts)
     when Status == 500; Status == 502; Status == 503; Status == 504 ->
     case get(Request, Opts#{backend_in_error => true}) of
-        {fresh, {_RespRef, Response}} ->
-            {not_cacheable, Response};
-        {stale, {_RespRef, Response}} ->
-            {not_cacheable, Response};
+        {fresh, {RespRef, Response}} ->
+            {not_cacheable, {RespRef, Response}};
+        {stale, {RespRef, Response}} ->
+            {not_cacheable, {RespRef, Response}};
         _ ->
             not_cacheable
     end;
