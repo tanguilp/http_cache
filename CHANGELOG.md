@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 ## [0.4.0] - XXXX-XX-XX
 
+### Fixed
+- `[http_cache]`: now takes `stale-if-error` and `stale-while-revalidate` directive values into
+account when calculating the grace period
+
 ### Changed
 
 - `[http_cache]`: handling of the `stale-if-error` directive has changed. Stale responses returned
