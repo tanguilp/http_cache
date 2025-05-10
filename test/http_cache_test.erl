@@ -22,16 +22,16 @@ http_cache_test_() ->
       fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
       fun opt_auto_decompress_multiple_content_encodings/1,
       fun opt_auto_decompress_when_body_is_a_file/1, fun opt_auto_decompress_strong_etags/1,
-      fun opt_compression_threshold/1, fun opt_bucket/1, fun opt_origin_unreachable/1,
-      fun opt_default_ttl/1, fun opt_ignore_query_params_order/1, fun opt_type/1,
-      fun opt_request_time/1, fun opt_prevent_set_cookie_private_auto/1,
-      fun opt_prevent_set_cookie_private_true/1, fun opt_prevent_set_cookie_private_false/1,
-      fun opt_prevent_set_cookie_shared_auto/1, fun opt_prevent_set_cookie_shared_true/1,
-      fun opt_prevent_set_cookie_shared_false/1, fun invalidate_url/1,
-      fun invalidate_by_alternate_key/1, fun invalidate_by_alternate_keys/1,
-      fun response_stored_in_file_by_backend/1, fun cache_3_transforms_response_compression/1,
-      fun cache_3_transforms_response_range/1, fun cache_4_transforms_response_compression/1,
-      fun cache_4_transforms_response_range/1, fun rfc9111_section_3_method_cacheable/1,
+      fun opt_compression_threshold/1, fun opt_bucket/1, fun opt_default_ttl/1,
+      fun opt_ignore_query_params_order/1, fun opt_type/1, fun opt_request_time/1,
+      fun opt_prevent_set_cookie_private_auto/1, fun opt_prevent_set_cookie_private_true/1,
+      fun opt_prevent_set_cookie_private_false/1, fun opt_prevent_set_cookie_shared_auto/1,
+      fun opt_prevent_set_cookie_shared_true/1, fun opt_prevent_set_cookie_shared_false/1,
+      fun invalidate_url/1, fun invalidate_by_alternate_key/1,
+      fun invalidate_by_alternate_keys/1, fun response_stored_in_file_by_backend/1,
+      fun cache_3_transforms_response_compression/1, fun cache_3_transforms_response_range/1,
+      fun cache_4_transforms_response_compression/1, fun cache_4_transforms_response_range/1,
+      fun rfc9111_section_3_method_cacheable/1,
       fun rfc9111_section_3_discard_non_final_statuses/1,
       fun rfc9111_section_3_nostore_absent/1, fun rfc9111_section_3_private_absent/1,
       fun rfc9111_section_3_authz_header/1, fun rfc9111_section_3_resp_has_expires_ccdir/1,
@@ -318,27 +318,6 @@ opt_bucket(Opts) ->
                     end)},
      {spawn,
       ?_assertMatch(miss,
-                    begin
-                        Store(),
-                        http_cache:get(Req, Opts)
-                    end)}].
-
-opt_origin_unreachable(Opts) ->
-    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-    Store =
-        fun() ->
-           http_cache:cache(Req,
-                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
-                            Opts)
-        end,
-    [{spawn,
-      ?_assertMatch({stale, _},
-                    begin
-                        Store(),
-                        http_cache:get(Req, Opts#{origin_unreachable => true})
-                    end)},
-     {spawn,
-      ?_assertMatch({must_revalidate, _},
                     begin
                         Store(),
                         http_cache:get(Req, Opts)

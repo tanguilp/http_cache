@@ -157,7 +157,6 @@
       auto_decompress => boolean(),
       bucket => term(),
       compression_threshold => non_neg_integer(),
-      origin_unreachable => boolean(),
       default_ttl => non_neg_integer(),
       default_grace => non_neg_integer(),
       ignore_query_params_order => boolean(),
@@ -245,12 +244,6 @@
 %%    [https://webmasters.stackexchange.com/questions/31750/what-is-recommended-minimum-object-size-for-gzip-performance-benefits].
 %%
 %%    Used by {@link cache/3} and {@link cache/4}. Defaults to `1000'.
-%%  </li>
-%%  <li>
-%%    `origin_unreachable': indicates that the current cache using this library is unable to
-%%    reach the origin server. In this case, a stale response can be returned even if the
-%%    HTTP cache headers do not explicitely allow it.
-%%    Used by {@link get/2}. Defaults to `false'.
 %%  </li>
 %%  <li>
 %%    `default_ttl': the default TTL, in seconds. This value is used when no TTL information
@@ -365,7 +358,6 @@
           auto_decompress => false,
           compression_threshold => 1000,
           bucket => default,
-          origin_unreachable => false,
           default_ttl => ?DEFAULT_TTL,
           default_grace => ?DEFAULT_GRACE,
           ignore_query_params_order => false,
@@ -403,15 +395,13 @@
 %%    <li>`{stale, {http_cache_store_behaviour:response_ref(), response()}}':
 %%    the response is stale but can be directly returned to the client.
 %%
-%%    Stale responses that are cached but cannot be returned do to
-%%    unfulfilled condition are not returned.
-%%
-%%    By default, a stale response is returned only when there's a
-%%    `max-stale' header in the request. See the following option to enable
-%%    returning stale response in other cases:
+%%    A stale response can be returned when:
 %%      <ul>
-%%        <li>`allow_stale_while_revalidate'</li>
-%%        <li>`origin_unreachable'</li>
+%%        <li>the request `max-stale' directive is used by the client</li>
+%%        <li>the `allow-stale-while-revalidate' directive is used either by the client or the
+%%        server</li>
+%%        <li>the `stale-if-error' is used. However such stale responses are returned by
+%%        {@link cache/3} and {@link cache/4} and not by this function</li>
 %%      </ul>
 %%    </li>
 %%    <li>`{must_revalidate, {http_cache_store_behaviour:response_ref(), response()}}':
@@ -1052,8 +1042,7 @@ candidate_freshness({_, _, _, _, #{parsed_headers := ParsedRespHeaders}} = Candi
                         orelse stale_if_error_satisfied(Candidate, ParsedRespHeaders, Opts)
                         orelse resp_stale_while_revalidate_satisfied(Candidate,
                                                                      ParsedRespHeaders,
-                                                                     Opts)
-                        orelse map_get(origin_unreachable, Opts),
+                                                                     Opts),
 
                     case CanBeServedStale of
                         true ->
