@@ -13,12 +13,12 @@
          511]).
 -define(HEURISTICALLY_CACHEABLE_STATUSES,
         [200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 451, 501]).
+-define(STALE_IF_ERROR_STATUSES, [500, 502, 503, 504]).
 
 http_cache_test_() ->
     {foreach,
      fun init/0,
-     [fun opt_allow_stale_while_revalidate/1, fun opt_allow_stale_if_error_req_header/1,
-      fun opt_allow_stale_if_error_resp_header/1, fun opt_auto_accept_encoding/1,
+     [fun opt_allow_stale_while_revalidate/1, fun opt_auto_accept_encoding/1,
       fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
       fun opt_auto_decompress_multiple_content_encodings/1,
       fun opt_auto_decompress_when_body_is_a_file/1, fun opt_auto_decompress_strong_etags/1,
@@ -128,50 +128,6 @@ opt_allow_stale_while_revalidate(Opts) ->
                     begin
                         Store(),
                         http_cache:get(Req, Opts#{allow_stale_while_revalidate => true})
-                    end)},
-     {spawn,
-      ?_assertMatch({must_revalidate, _},
-                    begin
-                        Store(),
-                        http_cache:get(Req, Opts)
-                    end)}].
-
-opt_allow_stale_if_error_req_header(Opts) ->
-    Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"stale-if-error=60">>}], <<"">>},
-    Store =
-        fun() ->
-           http_cache:cache(Req,
-                            {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
-                            Opts)
-        end,
-    [{spawn,
-      ?_assertMatch({stale, _},
-                    begin
-                        Store(),
-                        http_cache:get(Req, Opts#{allow_stale_if_error => true})
-                    end)},
-     {spawn,
-      ?_assertMatch({must_revalidate, _},
-                    begin
-                        Store(),
-                        http_cache:get(Req, Opts)
-                    end)}].
-
-opt_allow_stale_if_error_resp_header(Opts) ->
-    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-    Store =
-        fun() ->
-           http_cache:cache(Req,
-                            {200,
-                             [{<<"cache-control">>, <<"max-age=0, stale-if-error=60">>}],
-                             <<"Some content">>},
-                            Opts)
-        end,
-    [{spawn,
-      ?_assertMatch({stale, _},
-                    begin
-                        Store(),
-                        http_cache:get(Req, Opts#{allow_stale_if_error => true})
                     end)},
      {spawn,
       ?_assertMatch({must_revalidate, _},
@@ -2484,12 +2440,12 @@ rfc5861_stale_if_error_req_not_expired(Opts) ->
                             {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
                             Opts)
         end,
-    {spawn,
-     ?_assertMatch({stale, _},
+    [{spawn,
+     ?_assertMatch({ok, {200, _, <<"Some content">>}},
                    begin
                        Store(),
-                       http_cache:get(Req, Opts#{allow_stale_if_error => true})
-                   end)}.
+                       http_cache:cache(Req, {ErrorStatus, [], <<>>}, Opts)
+                   end)} || ErrorStatus <- ?STALE_IF_ERROR_STATUSES].
 
 rfc5861_stale_if_error_req_expired(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [{<<"cache-control">>, <<"stale-if-error=0">>}], <<"">>},
@@ -2499,12 +2455,12 @@ rfc5861_stale_if_error_req_expired(Opts) ->
                             {200, [{<<"cache-control">>, <<"max-age=0">>}], <<"Some content">>},
                             Opts)
         end,
-    {spawn,
-     ?_assertMatch({must_revalidate, _},
+    [{spawn,
+     ?_assertEqual(not_cacheable,
                    begin
                        Store(),
-                       http_cache:get(Req, Opts#{allow_stale_if_error => true})
-                   end)}.
+                       http_cache:cache(Req, {ErrorStatus, [], <<>>}, Opts)
+                   end)} || ErrorStatus <- ?STALE_IF_ERROR_STATUSES].
 
 rfc5861_stale_if_error_resp_not_expired(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -2516,12 +2472,12 @@ rfc5861_stale_if_error_resp_not_expired(Opts) ->
                              <<"Some content">>},
                             Opts)
         end,
-    {spawn,
-     ?_assertMatch({stale, _},
+    [{spawn,
+     ?_assertMatch({ok, {200, _, <<"Some content">>}},
                    begin
                        Store(),
-                       http_cache:get(Req, Opts#{allow_stale_if_error => true})
-                   end)}.
+                       http_cache:cache(Req, {ErrorStatus, [], <<>>}, Opts)
+                   end)} || ErrorStatus <- ?STALE_IF_ERROR_STATUSES].
 
 rfc5861_stale_if_error_resp_expired(Opts) ->
     Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
@@ -2533,12 +2489,12 @@ rfc5861_stale_if_error_resp_expired(Opts) ->
                              <<"Some content">>},
                             Opts)
         end,
-    {spawn,
-     ?_assertMatch({must_revalidate, _},
+    [{spawn,
+     ?_assertEqual(not_cacheable,
                    begin
                        Store(),
-                       http_cache:get(Req, Opts#{allow_stale_if_error => true})
-                   end)}.
+                       http_cache:cache(Req, {ErrorStatus, [], <<>>}, Opts)
+                   end)} || ErrorStatus <- ?STALE_IF_ERROR_STATUSES].
 
 rfc7233_single_byte_range(Opts) ->
     F = fun(Range) ->
