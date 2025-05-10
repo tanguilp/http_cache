@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
+## [0.4.0] - XXXX-XX-XX
+
+### Changed
+
+- `[http_cache]`: handling of the `stale-if-error` directive has changed. Stale responses returned
+in this case are now returned by the `cache/3` and `cache/4` functions, whose signature has changed
+
+### Removed
+
+- `[http_cache]`: the `stale_if_error` option has been removed
+- `[http_cache]`: the `origin_unreachable` option has been removed
+
 ## [0.3.2] - 2025-04-07
 
 ### Fixed
