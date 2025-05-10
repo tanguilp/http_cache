@@ -152,7 +152,6 @@
     #{store := module(),
       alternate_keys => [alternate_key()],
       allow_stale_while_revalidate => boolean(),
-      allow_stale_if_error => boolean(),
       auto_accept_encoding => boolean(),
       auto_compress => boolean(),
       auto_decompress => boolean(),
@@ -166,7 +165,8 @@
       prevent_set_cookie => auto | boolean(),
       request_time => non_neg_integer(),
       store_opts => http_cache_store_behaviour:opts(),
-      type => type()}.
+      type => type(),
+      atom() => any()}.
 %% Options passed to the functions of this module
 %%
 %% <ul>
@@ -177,11 +177,6 @@
 %%  </li>
 %%  <li>
 %%    `allow_stale_while_revalidate': allows returning valid stale response while revalidating.
-%%    Used by {@link get/2}. Defaults to `false'.
-%%  </li>
-%%  <li>
-%%    `allow_stale_if_error': allows returning valid stale response when an error occurs.
-%%    See [https://datatracker.ietf.org/doc/html/rfc5861#section-3].
 %%    Used by {@link get/2}. Defaults to `false'.
 %%  </li>
 %%  <li>
@@ -363,7 +358,7 @@
           <<"upgrade">> => []}).
 -define(DEFAULT_OPTS,
         #{allow_stale_while_revalidate => false,
-          allow_stale_if_error => false,
+          backend_in_error => false,
           alternate_keys => [],
           auto_accept_encoding => false,
           auto_compress => false,
@@ -416,7 +411,6 @@
 %%    returning stale response in other cases:
 %%      <ul>
 %%        <li>`allow_stale_while_revalidate'</li>
-%%        <li>`allow_stale_if_error'</li>
 %%        <li>`origin_unreachable'</li>
 %%      </ul>
 %%    </li>
@@ -701,9 +695,22 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
                     do_cache(Request, ParsedReqHeaders, Response, ParsedRespHeaders, Opts);
                 false ->
                     telemetry_set_metadata(cacheable, false),
-                    not_cacheable
+                    handle_stale_if_error(Request, Response, Opts)
             end
     end.
+
+handle_stale_if_error(Request, {Status, _, _}, Opts)
+    when Status == 500; Status == 502; Status == 503; Status == 504 ->
+    case get(Request, Opts#{backend_in_error => true}) of
+        {fresh, {_RespRef, Response}} ->
+            {ok, Response};
+        {stale, {_RespRef, Response}} ->
+            {ok, Response};
+        _ ->
+            not_cacheable
+    end;
+handle_stale_if_error(_, _, _) ->
+    not_cacheable.
 
 do_cache({Method, Url, ReqHeaders0, ReqBody} = Request,
          ParsedReqHeaders0,
@@ -1114,7 +1121,7 @@ stale_if_error_satisfied(Candidate, ParsedHeaders, Opts) ->
 
 stale_if_error_satisfied({_, _, _, _, #{expires := Expires}},
                          #{<<"cache-control">> := #{<<"stale-if-error">> := StaleIfErrorDur}},
-                         #{allow_stale_if_error := true},
+                         #{backend_in_error := true},
                          Now)
     when Now - Expires < StaleIfErrorDur ->
     true;
