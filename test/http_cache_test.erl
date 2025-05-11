@@ -18,8 +18,8 @@
 http_cache_test_() ->
     {foreach,
      fun init/0,
-     [fun opt_allow_stale_while_revalidate/1, fun opt_auto_accept_encoding/1,
-      fun opt_auto_compress/1, fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
+     [fun opt_auto_accept_encoding/1, fun opt_auto_compress/1,
+      fun opt_auto_compress_strong_etags/1, fun opt_auto_decompress/1,
       fun opt_auto_decompress_multiple_content_encodings/1,
       fun opt_auto_decompress_when_body_is_a_file/1, fun opt_auto_decompress_strong_etags/1,
       fun opt_compression_threshold/1, fun opt_bucket/1, fun opt_default_ttl/1,
@@ -112,29 +112,6 @@ http_cache_test_() ->
       fun rfc7233_no_satisfiable_range_content_range_header/1,
       fun rfc7233_range_ignored_not_get/1, fun rfc7233_error_on_too_many_ranges/1,
       fun rfc7233_range_and_accept_encoding/1]}.
-
-opt_allow_stale_while_revalidate(Opts) ->
-    Req = {<<"GET">>, ?TEST_URL, [], <<"">>},
-    Store =
-        fun() ->
-           http_cache:cache(Req,
-                            {200,
-                             [{<<"cache-control">>, <<"max-age=0, stale-while-revalidate=60">>}],
-                             <<"Some content">>},
-                            Opts)
-        end,
-    [{spawn,
-      ?_assertMatch({stale, _},
-                    begin
-                        Store(),
-                        http_cache:get(Req, Opts#{allow_stale_while_revalidate => true})
-                    end)},
-     {spawn,
-      ?_assertMatch({must_revalidate, _},
-                    begin
-                        Store(),
-                        http_cache:get(Req, Opts)
-                    end)}].
 
 opt_auto_accept_encoding(Opts) ->
     F = fun(Headers) ->
@@ -2409,7 +2386,7 @@ rfc5861_stale_while_revalidate_not_expired(Opts) ->
      ?_assertMatch({stale, _},
                    begin
                        Store(),
-                       http_cache:get(Req, Opts#{allow_stale_while_revalidate => true})
+                       http_cache:get(Req, Opts#{stale_while_revalidate_supported => true})
                    end)}.
 
 rfc5861_stale_while_revalidate_expired(Opts) ->
@@ -2426,7 +2403,7 @@ rfc5861_stale_while_revalidate_expired(Opts) ->
      ?_assertMatch({must_revalidate, _},
                    begin
                        Store(),
-                       http_cache:get(Req, Opts#{allow_stale_while_revalidate => true})
+                       http_cache:get(Req, Opts#{stale_while_revalidate_supported => true})
                    end)}.
 
 rfc5861_stale_if_error_req_not_expired(Opts) ->

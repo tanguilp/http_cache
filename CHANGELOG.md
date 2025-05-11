@@ -10,6 +10,8 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 - `[http_cache]`: handling of the `stale-if-error` directive has changed. Stale responses returned
 in this case are now returned by the `cache/3` and `cache/4` functions, whose signature has changed
+- `[http_cache]`: the `allow_stale_while_revalidate` option was renamed to
+`stale_while_revalidate_supported`
 
 ### Removed
 
