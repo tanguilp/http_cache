@@ -1051,7 +1051,8 @@ candidate_freshness({_, _, _, _, #{parsed_headers := ParsedRespHeaders}} = Candi
                         orelse stale_if_error_satisfied(Candidate, ParsedRespHeaders, Opts)
                         orelse resp_stale_while_revalidate_satisfied(Candidate,
                                                                      ParsedRespHeaders,
-                                                                     Opts),
+                                                                     Opts)
+                               andalso not req_max_stale_rejected(Candidate, ParsedReqHeaders),
 
                     case CanBeServedStale of
                         true ->
@@ -1158,6 +1159,18 @@ resp_proxy_must_revalidate(#{<<"cache-control">> := #{<<"proxy-revalidate">> := 
     true;
 resp_proxy_must_revalidate(_, _) ->
     false.
+
+req_max_stale_rejected(Candidate, ParsedReqHeaders) ->
+    has_cache_directive(<<"max-stale">>, ParsedReqHeaders)
+    andalso not req_max_stale_satisfied(Candidate, ParsedReqHeaders).
+
+has_cache_directive(Directive, ParsedHeaders) ->
+    case ParsedHeaders of
+        #{<<"cache-control">> := CacheControlDirectives} ->
+            maps:is_key(Directive, CacheControlDirectives);
+        _ ->
+            false
+    end.
 
 %%====================================================================
 %% Internal functions related to response post-processing
