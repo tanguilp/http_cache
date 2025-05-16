@@ -104,6 +104,7 @@ http_cache_test_() ->
       fun rfc9111_section_5_3_header_expires/1, fun rfc9111_section_5_4_header_pragma/1,
       fun rfc5861_stale_while_revalidate_not_expired/1,
       fun rfc5861_stale_while_revalidate_expired/1,
+      fun rfc5861_stale_while_revalidate_max_stale_has_precedence/1,
       fun rfc5861_stale_if_error_req_not_expired/1, fun rfc5861_stale_if_error_req_expired/1,
       fun rfc5861_stale_if_error_resp_not_expired/1, fun rfc5861_stale_if_error_resp_expired/1,
       fun rfc7233_single_byte_range/1, fun rfc7233_single_byte_range_headers/1,
@@ -2404,6 +2405,23 @@ rfc5861_stale_while_revalidate_expired(Opts) ->
                    begin
                        Store(),
                        http_cache:get(Req, Opts#{stale_while_revalidate_supported => true})
+                   end)}.
+
+rfc5861_stale_while_revalidate_max_stale_has_precedence(Opts) ->
+    {spawn,
+     ?_assertMatch({must_revalidate, _},
+                   begin
+                       http_cache:cache({<<"GET">>, ?TEST_URL, [], <<>>},
+                                        {200,
+                                         [{<<"cache-control">>,
+                                           <<"max-age=0, stale-while-revalidate=60">>}],
+                                         <<>>},
+                                        Opts),
+                       http_cache:get({<<"GET">>,
+                                       ?TEST_URL,
+                                       [{<<"cache-control">>, <<"max-stale=0">>}],
+                                       <<>>},
+                                      Opts#{stale_while_revalidate_supported => true})
                    end)}.
 
 rfc5861_stale_if_error_req_not_expired(Opts) ->
