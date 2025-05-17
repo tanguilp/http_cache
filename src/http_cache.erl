@@ -152,13 +152,11 @@
     #{store := module(),
       alternate_keys => [alternate_key()],
       allow_stale_while_revalidate => boolean(),
-      allow_stale_if_error => boolean(),
       auto_accept_encoding => boolean(),
       auto_compress => boolean(),
       auto_decompress => boolean(),
       bucket => term(),
       compression_threshold => non_neg_integer(),
-      origin_unreachable => boolean(),
       default_ttl => non_neg_integer(),
       default_grace => non_neg_integer(),
       ignore_query_params_order => boolean(),
@@ -166,7 +164,8 @@
       prevent_set_cookie => auto | boolean(),
       request_time => non_neg_integer(),
       store_opts => http_cache_store_behaviour:opts(),
-      type => type()}.
+      type => type(),
+      atom() => any()}.
 %% Options passed to the functions of this module
 %%
 %% <ul>
@@ -177,11 +176,6 @@
 %%  </li>
 %%  <li>
 %%    `allow_stale_while_revalidate': allows returning valid stale response while revalidating.
-%%    Used by {@link get/2}. Defaults to `false'.
-%%  </li>
-%%  <li>
-%%    `allow_stale_if_error': allows returning valid stale response when an error occurs.
-%%    See [https://datatracker.ietf.org/doc/html/rfc5861#section-3].
 %%    Used by {@link get/2}. Defaults to `false'.
 %%  </li>
 %%  <li>
@@ -250,12 +244,6 @@
 %%    [https://webmasters.stackexchange.com/questions/31750/what-is-recommended-minimum-object-size-for-gzip-performance-benefits].
 %%
 %%    Used by {@link cache/3} and {@link cache/4}. Defaults to `1000'.
-%%  </li>
-%%  <li>
-%%    `origin_unreachable': indicates that the current cache using this library is unable to
-%%    reach the origin server. In this case, a stale response can be returned even if the
-%%    HTTP cache headers do not explicitely allow it.
-%%    Used by {@link get/2}. Defaults to `false'.
 %%  </li>
 %%  <li>
 %%    `default_ttl': the default TTL, in seconds. This value is used when no TTL information
@@ -363,14 +351,13 @@
           <<"upgrade">> => []}).
 -define(DEFAULT_OPTS,
         #{allow_stale_while_revalidate => false,
-          allow_stale_if_error => false,
+          backend_in_error => false,
           alternate_keys => [],
           auto_accept_encoding => false,
           auto_compress => false,
           auto_decompress => false,
           compression_threshold => 1000,
           bucket => default,
-          origin_unreachable => false,
           default_ttl => ?DEFAULT_TTL,
           default_grace => ?DEFAULT_GRACE,
           ignore_query_params_order => false,
@@ -408,16 +395,13 @@
 %%    <li>`{stale, {http_cache_store_behaviour:response_ref(), response()}}':
 %%    the response is stale but can be directly returned to the client.
 %%
-%%    Stale responses that are cached but cannot be returned do to
-%%    unfulfilled condition are not returned.
-%%
-%%    By default, a stale response is returned only when there's a
-%%    `max-stale' header in the request. See the following option to enable
-%%    returning stale response in other cases:
+%%    A stale response can be returned when:
 %%      <ul>
-%%        <li>`allow_stale_while_revalidate'</li>
-%%        <li>`allow_stale_if_error'</li>
-%%        <li>`origin_unreachable'</li>
+%%        <li>the request `max-stale' directive is used by the client</li>
+%%        <li>the `allow-stale-while-revalidate' directive is used either by the client or the
+%%        server</li>
+%%        <li>the `stale-if-error' is used. However such stale responses are returned by
+%%        {@link cache/3} and {@link cache/4} and not by this function</li>
 %%      </ul>
 %%    </li>
 %%    <li>`{must_revalidate, {http_cache_store_behaviour:response_ref(), response()}}':
@@ -594,6 +578,16 @@ notify_response_used(RespRef, Opts) ->
 %% and it will be returned as a range response if the request is a range
 %% request and the backend doesn't support it and returned a full response.
 %%
+%% `{not_cacheable, {response_ref(), response()}}' is returned when the response in parameters:
+%% <ul>
+%%   <li>has a `500', `502', `503' or `504' error status</li>
+%%   <li>is not cacheable (e.g. it has no explicit `max-age' cache-control directive)</li>
+%%   <li>a response observing the `stale-if-error' cache control directive has been found</li>
+%% </ul>
+%%
+%% That is, this function looks up for a stale response automatically as documented by
+%% [https://datatracker.ietf.org/doc/html/rfc5861#section-4].
+%%
 %% This function shall be called with any response, even those known to be not
 %% cacheable, such as `DELETE' requests, because such non-cacheable request
 %% can still have side effects on other cached objects
@@ -604,7 +598,10 @@ notify_response_used(RespRef, Opts) ->
 %% @end
 %%------------------------------------------------------------------------------
 
--spec cache(request(), response(), opts()) -> {ok, response()} | not_cacheable.
+-spec cache(request(), response(), opts()) ->
+               {ok, response()} |
+               {not_cacheable, {http_cache_store_behaviour:response_ref(), response()}} |
+               not_cacheable.
 cache(Request, {_, RespHeaders, _} = Response, Opts) ->
     telemetry_start_measurement(total_time),
     NormOpts = init_opts(Opts),
@@ -646,7 +643,9 @@ do_cache(Request, Response, NormOpts) ->
             Response :: response(),
             RevalidatedResponse :: response(),
             opts()) ->
-               {ok, response()} | not_cacheable.
+               {ok, response()} |
+               {not_cacheable, {http_cache_store_behaviour:response_ref(), response()}} |
+               not_cacheable.
 cache(Request, Response, RevalidatedResponse, Opts) ->
     telemetry_start_measurement(total_time),
     Result = do_cache(Request, Response, RevalidatedResponse, init_opts(Opts)),
@@ -701,9 +700,22 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
                     do_cache(Request, ParsedReqHeaders, Response, ParsedRespHeaders, Opts);
                 false ->
                     telemetry_set_metadata(cacheable, false),
-                    not_cacheable
+                    handle_stale_if_error(Request, Response, Opts)
             end
     end.
+
+handle_stale_if_error(Request, {Status, _, _}, Opts)
+    when Status == 500; Status == 502; Status == 503; Status == 504 ->
+    case get(Request, Opts#{backend_in_error => true}) of
+        {fresh, {RespRef, Response}} ->
+            {not_cacheable, {RespRef, Response}};
+        {stale, {RespRef, Response}} ->
+            {not_cacheable, {RespRef, Response}};
+        _ ->
+            not_cacheable
+    end;
+handle_stale_if_error(_, _, _) ->
+    not_cacheable.
 
 do_cache({Method, Url, ReqHeaders0, ReqBody} = Request,
          ParsedReqHeaders0,
@@ -1037,8 +1049,7 @@ candidate_freshness({_, _, _, _, #{parsed_headers := ParsedRespHeaders}} = Candi
                         orelse stale_if_error_satisfied(Candidate, ParsedRespHeaders, Opts)
                         orelse resp_stale_while_revalidate_satisfied(Candidate,
                                                                      ParsedRespHeaders,
-                                                                     Opts)
-                        orelse map_get(origin_unreachable, Opts),
+                                                                     Opts),
 
                     case CanBeServedStale of
                         true ->
@@ -1114,7 +1125,7 @@ stale_if_error_satisfied(Candidate, ParsedHeaders, Opts) ->
 
 stale_if_error_satisfied({_, _, _, _, #{expires := Expires}},
                          #{<<"cache-control">> := #{<<"stale-if-error">> := StaleIfErrorDur}},
-                         #{allow_stale_if_error := true},
+                         #{backend_in_error := true},
                          Now)
     when Now - Expires < StaleIfErrorDur ->
     true;
