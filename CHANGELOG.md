@@ -6,28 +6,21 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 ## [0.4.0] - XXXX-XX-XX
 
-### Fixed
-
-- [`http_cache`]: `max-stale` now takes precedence over `stale-while-revalidate`. That is
-`max-stale=0` will never return a stale response even if `stale-while-revalidate` is set
-
 ### Changed
 
-- [`http_cache`]: handling of the `stale-if-error` directive has changed. Stale responses returned
+- `[http_cache]`: handling of the `stale-if-error` directive has changed. Stale responses returned
 in this case are now returned by the `cache/3` and `cache/4` functions, whose signature has changed
-- [`http_cache`]: the `allow_stale_while_revalidate` option was renamed to
-`stale_while_revalidate_supported`
 
 ### Removed
 
-- [`http_cache`]: the `stale_if_error` option has been removed
-- [`http_cache`]: the `origin_unreachable` option has been removed
+- `[http_cache]`: the `stale_if_error` option has been removed
+- `[http_cache]`: the `origin_unreachable` option has been removed
 
 ## [0.3.2] - 2025-04-07
 
 ### Fixed
 
-- [`http_cache`] Fixed bug that made cache/3 and cache/4 return gziped content even
+- `[http_cache]` Fixed bug that made cache/3 and cache/4 return gziped content even
 when the request didn't support gzip
 
 ## [0.3.1] - 2023-12-20
