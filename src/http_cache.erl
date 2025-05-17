@@ -253,8 +253,8 @@
 %%  </li>
 %%  <li>
 %%    `default_grace': the amount of time an expired response is kept in the cache. Such
-%%    a response is called a stale response, and can be returned in some circumstances, for
-%%    instance when the origin server returns an `5xx' error and `stale-if-error' header is used.
+%%    a response is called a stale response, and can be returned in some circumstances after
+%%    its expiration.
 %%    Use by {@link cache/3} and {@link cache/4}. Defaults to `120'.
 %%  </li>
 %%  <li>
@@ -790,7 +790,7 @@ response_metadata(ParsedRespHeaders, Opts) ->
     {TTLSetBy, Expires} = expires(CreatedAt, MaybeDate, ParsedRespHeaders, Opts),
     #{created => CreatedAt,
       expires => Expires,
-      grace => grace(Expires, Opts),
+      grace => grace(ParsedRespHeaders, Expires, Opts),
       ttl_set_by => TTLSetBy,
       % For more efficiency, we store only headers we might need when getting responses
       parsed_headers =>
@@ -1367,7 +1367,25 @@ expires(_CreatedAt, _MaybeDate, #{<<"expires">> := Expires}, _Opts) ->
 expires(CreatedAt, _MaybeDate, _ParsedRespHeaders, #{default_ttl := DefaultTTL}) ->
     {heuristics, CreatedAt + DefaultTTL}.
 
-grace(Expires, #{default_grace := Grace}) ->
+grace(#{<<"cache-control">> :=
+            #{<<"stale-if-error">> := StaleIfErrorDur,
+              <<"stale-while-revalidate">> := StaleWhileRevalidateDur}},
+      Expires,
+      #{default_grace := Grace})
+    when StaleIfErrorDur > StaleWhileRevalidateDur andalso StaleIfErrorDur > Grace ->
+    Expires + StaleIfErrorDur;
+grace(#{<<"cache-control">> :=
+            #{<<"stale-while-revalidate">> := StaleWhileRevalidateDur}},
+      Expires,
+      #{default_grace := Grace})
+    when StaleWhileRevalidateDur > Grace ->
+    Expires + StaleWhileRevalidateDur;
+grace(#{<<"cache-control">> := #{<<"stale-if-error">> := StaleIfErrorDur}},
+      Expires,
+      #{default_grace := Grace})
+    when StaleIfErrorDur > Grace ->
+    Expires + StaleIfErrorDur;
+grace(_ParsedRespHeaders, Expires, #{default_grace := Grace}) ->
     Expires + Grace.
 
 cache_type(#{type := Type}) ->
