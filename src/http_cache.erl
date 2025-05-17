@@ -151,7 +151,6 @@
 -type opts() ::
     #{store := module(),
       alternate_keys => [alternate_key()],
-      allow_stale_while_revalidate => boolean(),
       auto_accept_encoding => boolean(),
       auto_compress => boolean(),
       auto_decompress => boolean(),
@@ -163,6 +162,7 @@
       max_ranges => non_neg_integer(),
       prevent_set_cookie => auto | boolean(),
       request_time => non_neg_integer(),
+      stale_while_revalidate_supported => boolean(),
       store_opts => http_cache_store_behaviour:opts(),
       type => type(),
       atom() => any()}.
@@ -173,10 +173,6 @@
 %%    `alternate_keys': alternate keys associated with the stored request. Requests
 %%    can then be invalidated by alternate key with {@link invalidate_by_alternate_key/2}.
 %%    Use by {@link cache/3} and {@link cache/4}.
-%%  </li>
-%%  <li>
-%%    `allow_stale_while_revalidate': allows returning valid stale response while revalidating.
-%%    Used by {@link get/2}. Defaults to `false'.
 %%  </li>
 %%  <li>
 %%    `auto_accept_encoding': automatically selects an acceptable response based on
@@ -281,6 +277,12 @@
 %%    Used by all functions, no defaults.
 %%  </li>
 %%  <li>
+%%    `stale_while_revalidate_supported': indicates support for the `stale-while-revalidate'
+%%    directive. In this case, the code calling this library is in charge of asynchronously
+%%    revalidating the response, and at the same time can directly return the stale response.
+%%    Used by {@link get/2}. Defaults to `false'.
+%%  </li>
+%%  <li>
 %%    `store_opts': the store backend's options.
 %%    Used by all functions, defaults to `[]'.
 %%  </li>
@@ -350,12 +352,11 @@
           <<"transfer-encoding">> => [],
           <<"upgrade">> => []}).
 -define(DEFAULT_OPTS,
-        #{allow_stale_while_revalidate => false,
-          backend_in_error => false,
-          alternate_keys => [],
+        #{alternate_keys => [],
           auto_accept_encoding => false,
           auto_compress => false,
           auto_decompress => false,
+          backend_in_error => false,
           compression_threshold => 1000,
           bucket => default,
           default_ttl => ?DEFAULT_TTL,
@@ -363,6 +364,7 @@
           ignore_query_params_order => false,
           max_ranges => 100,
           prevent_set_cookie => auto,
+          stale_while_revalidate_supported => false,
           store_opts => [],
           type => shared}).
 -define(PDICT_MEASUREMENTS, http_cache_measurments).
@@ -1049,7 +1051,8 @@ candidate_freshness({_, _, _, _, #{parsed_headers := ParsedRespHeaders}} = Candi
                         orelse stale_if_error_satisfied(Candidate, ParsedRespHeaders, Opts)
                         orelse resp_stale_while_revalidate_satisfied(Candidate,
                                                                      ParsedRespHeaders,
-                                                                     Opts),
+                                                                     Opts)
+                               andalso not req_max_stale_rejected(Candidate, ParsedReqHeaders),
 
                     case CanBeServedStale of
                         true ->
@@ -1139,7 +1142,7 @@ resp_stale_while_revalidate_satisfied({_, _, _, _, #{expires := Expires}},
                                       #{<<"cache-control">> :=
                                             #{<<"stale-while-revalidate">> :=
                                                   StaleWhileRevalidateDur}},
-                                      #{allow_stale_while_revalidate := true},
+                                      #{stale_while_revalidate_supported := true},
                                       Now)
     when Now - Expires < StaleWhileRevalidateDur ->
     true;
@@ -1156,6 +1159,18 @@ resp_proxy_must_revalidate(#{<<"cache-control">> := #{<<"proxy-revalidate">> := 
     true;
 resp_proxy_must_revalidate(_, _) ->
     false.
+
+req_max_stale_rejected(Candidate, ParsedReqHeaders) ->
+    has_cache_directive(<<"max-stale">>, ParsedReqHeaders)
+    andalso not req_max_stale_satisfied(Candidate, ParsedReqHeaders).
+
+has_cache_directive(Directive, ParsedHeaders) ->
+    case ParsedHeaders of
+        #{<<"cache-control">> := CacheControlDirectives} ->
+            maps:is_key(Directive, CacheControlDirectives);
+        _ ->
+            false
+    end.
 
 %%====================================================================
 %% Internal functions related to response post-processing
