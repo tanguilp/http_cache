@@ -1,6 +1,6 @@
 {application, http_cache, [
     {description, "HTTP caching library"},
-    {vsn, "0.4.0"},
+    {vsn, "1.0.0"},
     {registered, []},
     {applications, [kernel, stdlib]},
     {env, []},
