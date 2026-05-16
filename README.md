@@ -199,8 +199,3 @@ RFC9110: [HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110.html)
   - [ ] 14.4. Content-Range
   - [ ] 14.5. Partial PUT
   - [x] 14.6. Media Type multipart/byteranges
-
-## Contributing
-
-Format with `rebar3 format`. Pay attention that some lines of the macros in `src/http_cache.erl`
-must be manually edited because of an issue in the format plugin.

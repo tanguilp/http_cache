@@ -117,8 +117,14 @@
 -module(http_cache).
 
 %% API exports
--export([get/2, notify_downloading/3, notify_response_used/2, cache/3, cache/4,
-         invalidate_url/2, invalidate_by_alternate_key/2]).
+-export([
+    get/2,
+    notify_downloading/3,
+    notify_response_used/2,
+    cache/3, cache/4,
+    invalidate_url/2,
+    invalidate_by_alternate_key/2
+]).
 
 -export_type([alternate_key/0, headers/0, request/0, response/0, status/0, timestamp/0]).
 
@@ -149,23 +155,25 @@
 -type method() :: binary().
 %% An HTTP method, for example "PATCH"
 -type opts() ::
-    #{store := module(),
-      alternate_keys => [alternate_key()],
-      auto_accept_encoding => boolean(),
-      auto_compress => boolean(),
-      auto_decompress => boolean(),
-      bucket => term(),
-      compression_threshold => non_neg_integer(),
-      default_ttl => non_neg_integer(),
-      default_grace => non_neg_integer(),
-      ignore_query_params_order => boolean(),
-      max_ranges => non_neg_integer(),
-      prevent_set_cookie => auto | boolean(),
-      request_time => non_neg_integer(),
-      stale_while_revalidate_supported => boolean(),
-      store_opts => http_cache_store_behaviour:opts(),
-      type => type(),
-      atom() => any()}.
+    #{
+        store := module(),
+        alternate_keys => [alternate_key()],
+        auto_accept_encoding => boolean(),
+        auto_compress => boolean(),
+        auto_decompress => boolean(),
+        bucket => term(),
+        compression_threshold => non_neg_integer(),
+        default_ttl => non_neg_integer(),
+        default_grace => non_neg_integer(),
+        ignore_query_params_order => boolean(),
+        max_ranges => non_neg_integer(),
+        prevent_set_cookie => auto | boolean(),
+        request_time => non_neg_integer(),
+        stale_while_revalidate_supported => boolean(),
+        store_opts => http_cache_store_behaviour:opts(),
+        type => type(),
+        atom() => any()
+    }.
 %% Options passed to the functions of this module
 %%
 %% <ul>
@@ -307,10 +315,7 @@
 -type status() :: pos_integer().
 %% HTTP status
 -type sendfile() ::
-    {sendfile,
-     Offset :: non_neg_integer(),
-     Length :: non_neg_integer() | all,
-     Path :: binary()}.
+    {sendfile, Offset :: non_neg_integer(), Length :: non_neg_integer() | all, Path :: binary()}.
 -type timestamp() :: non_neg_integer().
 %% UNIX timestamp in seconds
 -type type() :: shared | private.
@@ -319,54 +324,58 @@
 
 -define(DEFAULT_TTL, 2 * 60).
 -define(DEFAULT_GRACE, 2 * 60).
--define(DEFAULT_COMPRESS_MIME_TYPES,
-        #{{<<"text">>, <<"html">>} => [],
-          {<<"text">>, <<"css">>} => [],
-          {<<"text">>, <<"plain">>} => [],
-          {<<"text">>, <<"xml">>} => [],
-          {<<"text">>, <<"javascript">>} => [],
-          {<<"application">>, <<"javascript">>} => [],
-          {<<"application">>, <<"json">>} => [],
-          {<<"application">>, <<"ld+json">>} => [],
-          {<<"application">>, <<"xml">>} => [],
-          {<<"application">>, <<"html+xml">>} => [],
-          {<<"application">>, <<"rss+xml">>} => [],
-          {<<"application">>, <<"atom+xml">>} => [],
-          {<<"image">>, <<"svg+xml">>} => [],
-          {<<"font">>, <<"ttf">>} => [],
-          {<<"font">>, <<"eot">>} => [],
-          {<<"font">>, <<"otf">>} => [],
-          {<<"font">>, <<"opentype">>} => []}).
--define(CSL_HEADERS,
-        #{<<"accept-encoding">> => [],
-          <<"cache-control">> => [],
-          <<"content-encoding">> => [],
-          <<"if-none-match">> => [],
-          <<"vary">> => []}).
+-define(DEFAULT_COMPRESS_MIME_TYPES, #{
+    {<<"text">>, <<"html">>} => [],
+    {<<"text">>, <<"css">>} => [],
+    {<<"text">>, <<"plain">>} => [],
+    {<<"text">>, <<"xml">>} => [],
+    {<<"text">>, <<"javascript">>} => [],
+    {<<"application">>, <<"javascript">>} => [],
+    {<<"application">>, <<"json">>} => [],
+    {<<"application">>, <<"ld+json">>} => [],
+    {<<"application">>, <<"xml">>} => [],
+    {<<"application">>, <<"html+xml">>} => [],
+    {<<"application">>, <<"rss+xml">>} => [],
+    {<<"application">>, <<"atom+xml">>} => [],
+    {<<"image">>, <<"svg+xml">>} => [],
+    {<<"font">>, <<"ttf">>} => [],
+    {<<"font">>, <<"eot">>} => [],
+    {<<"font">>, <<"otf">>} => [],
+    {<<"font">>, <<"opentype">>} => []
+}).
+-define(CSL_HEADERS, #{
+    <<"accept-encoding">> => [],
+    <<"cache-control">> => [],
+    <<"content-encoding">> => [],
+    <<"if-none-match">> => [],
+    <<"vary">> => []
+}).
 -define(KV_HEADERS, #{<<"accept-encoding">> => [], <<"cache-control">> => []}).
--define(RESP_HEADERS_TO_DELETE,
-        #{<<"connection">> => [],
-          <<"proxy-authenticate">> => [],
-          <<"proxy-connection">> => [],
-          <<"keep-alive">> => [],
-          <<"transfer-encoding">> => [],
-          <<"upgrade">> => []}).
--define(DEFAULT_OPTS,
-        #{alternate_keys => [],
-          auto_accept_encoding => false,
-          auto_compress => false,
-          auto_decompress => false,
-          backend_in_error => false,
-          compression_threshold => 1000,
-          bucket => default,
-          default_ttl => ?DEFAULT_TTL,
-          default_grace => ?DEFAULT_GRACE,
-          ignore_query_params_order => false,
-          max_ranges => 100,
-          prevent_set_cookie => auto,
-          stale_while_revalidate_supported => false,
-          store_opts => [],
-          type => shared}).
+-define(RESP_HEADERS_TO_DELETE, #{
+    <<"connection">> => [],
+    <<"proxy-authenticate">> => [],
+    <<"proxy-connection">> => [],
+    <<"keep-alive">> => [],
+    <<"transfer-encoding">> => [],
+    <<"upgrade">> => []
+}).
+-define(DEFAULT_OPTS, #{
+    alternate_keys => [],
+    auto_accept_encoding => false,
+    auto_compress => false,
+    auto_decompress => false,
+    backend_in_error => false,
+    compression_threshold => 1000,
+    bucket => default,
+    default_ttl => ?DEFAULT_TTL,
+    default_grace => ?DEFAULT_GRACE,
+    ignore_query_params_order => false,
+    max_ranges => 100,
+    prevent_set_cookie => auto,
+    stale_while_revalidate_supported => false,
+    store_opts => [],
+    type => shared
+}).
 -define(PDICT_MEASUREMENTS, http_cache_measurments).
 -define(TELEMETRY_LOOKUP_EVT, [http_cache, lookup]).
 -define(TELEMETRY_CACHE_EVT, [http_cache, cache]).
@@ -376,11 +385,13 @@
 -define(TELEMETRY_STORE_ERROR_EVT, [http_cache, store, error]).
 -define(TELEMETRY_PROCESS_TAG, {?MODULE, telemetry_data}).
 -define(is_no_transform(Headers),
-        (is_map_key(<<"cache-control">>, Headers)
-        andalso is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers)))).
+    (is_map_key(<<"cache-control">>, Headers) andalso
+        is_map_key(<<"no-transform">>, map_get(<<"cache-control">>, Headers)))
+).
 -define(has_strong_etag(ParsedRespHeaders),
-        (is_map_key(<<"etag">>, ParsedRespHeaders)
-        andalso element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong)).
+    (is_map_key(<<"etag">>, ParsedRespHeaders) andalso
+        element(1, map_get(<<"etag">>, ParsedRespHeaders)) == strong)
+).
 
 %%====================================================================
 %% API functions
@@ -420,10 +431,10 @@
 %%------------------------------------------------------------------------------
 
 -spec get(request(), opts()) ->
-             {fresh, {http_cache_store_behaviour:response_ref(), response()}} |
-             {stale, {http_cache_store_behaviour:response_ref(), response()}} |
-             {must_revalidate, {http_cache_store_behaviour:response_ref(), response()}} |
-             miss.
+    {fresh, {http_cache_store_behaviour:response_ref(), response()}}
+    | {stale, {http_cache_store_behaviour:response_ref(), response()}}
+    | {must_revalidate, {http_cache_store_behaviour:response_ref(), response()}}
+    | miss.
 get(Request, Opts) ->
     try
         telemetry_start_measurement(total_time),
@@ -448,22 +459,28 @@ get(Request, Opts) ->
             end
     end.
 
-do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request,
-       #{store := Store, store_opts := StoreOpts} = Opts) ->
+do_get(
+    {_Method, _Url, ReqHeaders, _ReqBody} = Request,
+    #{store := Store, store_opts := StoreOpts} = Opts
+) ->
     RequestKey = request_key(Request, Opts),
     telemetry_start_measurement(store_lookup_time),
     Candidates = Store:list_candidates(RequestKey, StoreOpts),
     telemetry_stop_measurement(store_lookup_time),
     telemetry_set_measurement(candidate_count, length(Candidates)),
     ParsedReqHeaders =
-        parse_headers(ReqHeaders,
-                      [<<"cache-control">>,
-                       <<"pragma">>,
-                       <<"accept-encoding">>,
-                       <<"range">>,
-                       <<"if-none-match">>,
-                       <<"if-modified-since">>,
-                       <<"if-range">>]),
+        parse_headers(
+            ReqHeaders,
+            [
+                <<"cache-control">>,
+                <<"pragma">>,
+                <<"accept-encoding">>,
+                <<"range">>,
+                <<"if-none-match">>,
+                <<"if-modified-since">>,
+                <<"if-range">>
+            ]
+        ),
     telemetry_start_measurement(response_selection_time),
     MaybeCandidate =
         select_candidate(ReqHeaders, ParsedReqHeaders, Candidates, undefined, Opts),
@@ -476,51 +493,62 @@ do_get({_Method, _Url, ReqHeaders, _ReqBody} = Request,
             telemetry_stop_measurement(store_get_response_time),
             case MaybeResponse of
                 {Status, RespHeaders, RespBody, RespMetadata} ->
-                    postprocess_response(Freshness,
-                                         Request,
-                                         ParsedReqHeaders,
-                                         RespRef,
-                                         {Status, RespHeaders, RespBody},
-                                         RespMetadata,
-                                         Opts);
+                    postprocess_response(
+                        Freshness,
+                        Request,
+                        ParsedReqHeaders,
+                        RespRef,
+                        {Status, RespHeaders, RespBody},
+                        RespMetadata,
+                        Opts
+                    );
                 undefined ->
                     throw(resp_body_no_longer_available)
             end;
         undefined ->
             telemetry_set_metadata(freshness, miss),
-            postprocess_response(miss,
-                                 Request,
-                                 ParsedReqHeaders,
-                                 undefined,
-                                 undefined,
-                                 undefined,
-                                 Opts)
+            postprocess_response(
+                miss,
+                Request,
+                ParsedReqHeaders,
+                undefined,
+                undefined,
+                undefined,
+                Opts
+            )
     end.
 
-postprocess_response(Freshness,
-                     _Request,
-                     #{<<"cache-control">> := #{<<"only-if-cached">> := _}},
-                     _MaybeRespRef,
-                     _MaybeResponse,
-                     _RespMetadata,
-                     _Opts)
-    when Freshness == must_revalidate orelse Freshness == miss ->
+postprocess_response(
+    Freshness,
+    _Request,
+    #{<<"cache-control">> := #{<<"only-if-cached">> := _}},
+    _MaybeRespRef,
+    _MaybeResponse,
+    _RespMetadata,
+    _Opts
+) when
+    Freshness == must_revalidate orelse Freshness == miss
+->
     {fresh, {undefined, {504, [], <<"">>}}};
-postprocess_response(miss,
-                     _Request,
-                     _ParsedReqHeaders,
-                     _RespRef,
-                     _Response0,
-                     _RespMetadata,
-                     _Opts) ->
+postprocess_response(
+    miss,
+    _Request,
+    _ParsedReqHeaders,
+    _RespRef,
+    _Response0,
+    _RespMetadata,
+    _Opts
+) ->
     miss;
-postprocess_response(Freshness,
-                     Request,
-                     ParsedReqHeaders,
-                     RespRef,
-                     Response0,
-                     RespMetadata,
-                     Opts) ->
+postprocess_response(
+    Freshness,
+    Request,
+    ParsedReqHeaders,
+    RespRef,
+    Response0,
+    RespMetadata,
+    Opts
+) ->
     case handle_conditions(Request, ParsedReqHeaders, Response0, RespMetadata) of
         {304, _, _} = Response1 ->
             {Freshness, {RespRef, Response1}};
@@ -561,7 +589,7 @@ notify_downloading(_Request, _Pid, _Opts) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec notify_response_used(http_cache_store_behaviour:response_ref(), opts()) ->
-                              ok | {error, term()}.
+    ok | {error, term()}.
 notify_response_used(RespRef, Opts) ->
     #{store := Store, store_opts := StoreOpts} = init_opts(Opts),
     Store:notify_response_used(RespRef, StoreOpts).
@@ -601,9 +629,9 @@ notify_response_used(RespRef, Opts) ->
 %%------------------------------------------------------------------------------
 
 -spec cache(request(), response(), opts()) ->
-               {ok, response()} |
-               {not_cacheable, {http_cache_store_behaviour:response_ref(), response()}} |
-               not_cacheable.
+    {ok, response()}
+    | {not_cacheable, {http_cache_store_behaviour:response_ref(), response()}}
+    | not_cacheable.
 cache(Request, {_, RespHeaders, _} = Response, Opts) ->
     telemetry_start_measurement(total_time),
     NormOpts = init_opts(Opts),
@@ -641,13 +669,15 @@ do_cache(Request, Response, NormOpts) ->
 %% @end
 %%------------------------------------------------------------------------------
 
--spec cache(Request :: request(),
-            Response :: response(),
-            RevalidatedResponse :: response(),
-            opts()) ->
-               {ok, response()} |
-               {not_cacheable, {http_cache_store_behaviour:response_ref(), response()}} |
-               not_cacheable.
+-spec cache(
+    Request :: request(),
+    Response :: response(),
+    RevalidatedResponse :: response(),
+    opts()
+) ->
+    {ok, response()}
+    | {not_cacheable, {http_cache_store_behaviour:response_ref(), response()}}
+    | not_cacheable.
 cache(Request, Response, RevalidatedResponse, Opts) ->
     telemetry_start_measurement(total_time),
     Result = do_cache(Request, Response, RevalidatedResponse, init_opts(Opts)),
@@ -655,10 +685,12 @@ cache(Request, Response, RevalidatedResponse, Opts) ->
     telemetry_send_event(?TELEMETRY_CACHE_EVT),
     Result.
 
-do_cache(Request,
-         {304, RespHeaders, _} = Response,
-         {Status, RevalidatedRespHeaders, RespBody},
-         NormOpts) ->
+do_cache(
+    Request,
+    {304, RespHeaders, _} = Response,
+    {Status, RevalidatedRespHeaders, RespBody},
+    NormOpts
+) ->
     check_set_cookie(RespHeaders, NormOpts),
     refresh_stored_responses(Request, Response, NormOpts),
     UpdatedHeaders = update_headers(RevalidatedRespHeaders, RespHeaders),
@@ -666,22 +698,28 @@ do_cache(Request,
 do_cache(Request, Response, _, NormOpts) ->
     do_cache(Request, Response, NormOpts).
 
-analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
-              {Status, RespHeaders, _RespBody} = Response,
-              Opts) ->
+analyze_cache(
+    {Method, _Url, ReqHeaders, _ReqBody} = Request,
+    {Status, RespHeaders, _RespBody} = Response,
+    Opts
+) ->
     telemetry_start_measurement(analysis_time),
     ParsedRespHeaders =
-        parse_headers(RespHeaders,
-                      [<<"age">>,
-                       <<"cache-control">>,
-                       <<"content-encoding">>,
-                       <<"content-type">>,
-                       <<"date">>,
-                       <<"etag">>,
-                       <<"expires">>,
-                       <<"last-modified">>,
-                       <<"pragma">>,
-                       <<"vary">>]),
+        parse_headers(
+            RespHeaders,
+            [
+                <<"age">>,
+                <<"cache-control">>,
+                <<"content-encoding">>,
+                <<"content-type">>,
+                <<"date">>,
+                <<"etag">>,
+                <<"expires">>,
+                <<"last-modified">>,
+                <<"pragma">>,
+                <<"vary">>
+            ]
+        ),
     % A POST request that triggers invalidation cannot be cacheable
     case must_invalidate_request_uri(Request, Response, ParsedRespHeaders) of
         true ->
@@ -690,11 +728,15 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
             not_cacheable;
         false ->
             ParsedReqHeaders =
-                parse_headers(ReqHeaders,
-                              [<<"authorization">>,
-                               <<"cache-control">>,
-                               <<"pragma">>,
-                               <<"range">>]),
+                parse_headers(
+                    ReqHeaders,
+                    [
+                        <<"authorization">>,
+                        <<"cache-control">>,
+                        <<"pragma">>,
+                        <<"range">>
+                    ]
+                ),
 
             case is_cacheable(Method, ParsedReqHeaders, Status, ParsedRespHeaders, Opts) of
                 true ->
@@ -706,8 +748,9 @@ analyze_cache({Method, _Url, ReqHeaders, _ReqBody} = Request,
             end
     end.
 
-handle_stale_if_error(Request, {Status, _, _}, Opts)
-    when Status == 500; Status == 502; Status == 503; Status == 504 ->
+handle_stale_if_error(Request, {Status, _, _}, Opts) when
+    Status == 500; Status == 502; Status == 503; Status == 504
+->
     case get(Request, Opts#{backend_in_error => true}) of
         {fresh, {RespRef, Response}} ->
             {not_cacheable, {RespRef, Response}};
@@ -719,56 +762,69 @@ handle_stale_if_error(Request, {Status, _, _}, Opts)
 handle_stale_if_error(_, _, _) ->
     not_cacheable.
 
-do_cache({Method, Url, ReqHeaders0, ReqBody} = Request,
-         ParsedReqHeaders0,
-         {Status, RespHeaders0, RespBody},
-         #{<<"content-type">> := {MainType, SubType, _}} = ParsedRespHeaders0,
-         #{auto_compress := true, compression_threshold := CompressionThresold} = Opts)
-    when byte_size(RespBody) >= CompressionThresold,
-         not is_map_key(<<"content-encoding">>, ParsedRespHeaders0),
-         not ?is_no_transform(ParsedRespHeaders0),
-         is_map_key({MainType, SubType}, ?DEFAULT_COMPRESS_MIME_TYPES),
-         not ?has_strong_etag(ParsedRespHeaders0) ->
+do_cache(
+    {Method, Url, ReqHeaders0, ReqBody} = Request,
+    ParsedReqHeaders0,
+    {Status, RespHeaders0, RespBody},
+    #{<<"content-type">> := {MainType, SubType, _}} = ParsedRespHeaders0,
+    #{auto_compress := true, compression_threshold := CompressionThresold} = Opts
+) when
+    byte_size(RespBody) >= CompressionThresold,
+    not is_map_key(<<"content-encoding">>, ParsedRespHeaders0),
+    not ?is_no_transform(ParsedRespHeaders0),
+    is_map_key({MainType, SubType}, ?DEFAULT_COMPRESS_MIME_TYPES),
+    not ?has_strong_etag(ParsedRespHeaders0)
+->
     ReqHeaders =
-        delete_header(<<"accept-encoding">>, ReqHeaders0)
-        ++ [{<<"accept-encoding">>, <<"gzip">>}],
+        delete_header(<<"accept-encoding">>, ReqHeaders0) ++
+            [{<<"accept-encoding">>, <<"gzip">>}],
     ParsedReqHeaders =
         maps:merge(ParsedReqHeaders0, parse_headers(ReqHeaders, [<<"accept-encoding">>])),
     RespHeaders =
-        set_header_value(<<"content-encoding">>,
-                         <<"gzip">>,
-                         set_header_value(<<"vary">>, <<"accept-encoding">>, RespHeaders0)),
+        set_header_value(
+            <<"content-encoding">>,
+            <<"gzip">>,
+            set_header_value(<<"vary">>, <<"accept-encoding">>, RespHeaders0)
+        ),
     ParsedRespHeaders =
-        maps:merge(ParsedRespHeaders0,
-                   parse_headers(RespHeaders, [<<"content-encoding">>, <<"vary">>])),
+        maps:merge(
+            ParsedRespHeaders0,
+            parse_headers(RespHeaders, [<<"content-encoding">>, <<"vary">>])
+        ),
     telemetry_start_measurement(compress_time),
     GzippedBody = zlib:gzip(RespBody),
     telemetry_stop_measurement(compress_time),
     telemetry:execute(?TELEMETRY_COMPRESS_EVT, #{}, #{alg => gzip}),
     {ok, Response} =
-        do_cache({Method, Url, ReqHeaders, ReqBody},
-                 ParsedReqHeaders,
-                 {Status, RespHeaders, GzippedBody},
-                 ParsedRespHeaders,
-                 Opts),
+        do_cache(
+            {Method, Url, ReqHeaders, ReqBody},
+            ParsedReqHeaders,
+            {Status, RespHeaders, GzippedBody},
+            ParsedRespHeaders,
+            Opts
+        ),
     RespMetadata = response_metadata(ParsedRespHeaders, Opts),
     ParsedReqHeadersFinal =
         maps:merge(ParsedReqHeaders0, parse_headers(ReqHeaders0, [<<"accept-encoding">>])),
     TransformedResponse =
         transform_response(Request, ParsedReqHeadersFinal, Response, RespMetadata, Opts),
     {ok, TransformedResponse};
-do_cache({_Method, Url, ReqHeaders0, _ReqBody} = Request,
-         ParsedReqHeaders,
-         {Status, RespHeaders0, RespBody0},
-         ParsedRespHeaders,
-         #{store := Store, store_opts := StoreOpts} = Opts) ->
+do_cache(
+    {_Method, Url, ReqHeaders0, _ReqBody} = Request,
+    ParsedReqHeaders,
+    {Status, RespHeaders0, RespBody0},
+    ParsedRespHeaders,
+    #{store := Store, store_opts := StoreOpts} = Opts
+) ->
     RespBodyBin = iolist_to_binary(RespBody0),
     % the response doesn't necessarily has the content length set, but we have this
     % information, so let's be a good citizen of the web and always set it
     RespHeaders1 =
-        set_header_value(<<"content-length">>,
-                         list_to_binary(integer_to_list(byte_size(RespBodyBin))),
-                         RespHeaders0),
+        set_header_value(
+            <<"content-length">>,
+            list_to_binary(integer_to_list(byte_size(RespBodyBin))),
+            RespHeaders0
+        ),
     RespHeaders2 = strip_connection_headers(RespHeaders1),
     RequestKey = request_key(Request, Opts),
     VaryHeaders = vary_headers(ReqHeaders0, ParsedRespHeaders),
@@ -790,21 +846,27 @@ response_metadata(ParsedRespHeaders, Opts) ->
     MaybeDate = maps:get(<<"date">>, ParsedRespHeaders, undefined),
     CreatedAt = created_at(MaybeAge, MaybeDate, Opts),
     {TTLSetBy, Expires} = expires(CreatedAt, MaybeDate, ParsedRespHeaders, Opts),
-    #{created => CreatedAt,
-      expires => Expires,
-      grace => grace(ParsedRespHeaders, Expires, Opts),
-      ttl_set_by => TTLSetBy,
-      % For more efficiency, we store only headers we might need when getting responses
-      parsed_headers =>
-          maps:with([<<"cache-control">>,
-                     <<"content-encoding">>,
-                     <<"content-type">>,
-                     <<"date">>,
-                     <<"etag">>,
-                     <<"last-modified">>,
-                     <<"pragma">>],
-                    ParsedRespHeaders),
-      alternate_keys => map_get(alternate_keys, Opts)}.
+    #{
+        created => CreatedAt,
+        expires => Expires,
+        grace => grace(ParsedRespHeaders, Expires, Opts),
+        ttl_set_by => TTLSetBy,
+        % For more efficiency, we store only headers we might need when getting responses
+        parsed_headers =>
+            maps:with(
+                [
+                    <<"cache-control">>,
+                    <<"content-encoding">>,
+                    <<"content-type">>,
+                    <<"date">>,
+                    <<"etag">>,
+                    <<"last-modified">>,
+                    <<"pragma">>
+                ],
+                ParsedRespHeaders
+            ),
+        alternate_keys => map_get(alternate_keys, Opts)
+    }.
 
 %%------------------------------------------------------------------------------
 %% @doc Invalidates all responses for a URL
@@ -827,19 +889,23 @@ do_invalidate_url(Url, #{store := Store, store_opts := StoreOpts} = Opts) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec invalidate_by_alternate_key(alternate_key() | [alternate_key()], opts()) ->
-                                     invalidation_result().
+    invalidation_result().
 invalidate_by_alternate_key(AltKeys, Opts) ->
     do_invalidate_by_alternate_key(AltKeys, init_opts(Opts)).
 
 do_invalidate_by_alternate_key([], _Opts) ->
     {ok, 0};
-do_invalidate_by_alternate_key([_ | _] = AltKeys,
-                               #{store := Store, store_opts := StoreOpts}) ->
+do_invalidate_by_alternate_key(
+    [_ | _] = AltKeys,
+    #{store := Store, store_opts := StoreOpts}
+) ->
     {InvalidationDur, InvalidationRes} =
         timer:tc(Store, invalidate_by_alternate_key, [AltKeys, StoreOpts]),
-    telemetry_log_invalidation_result(InvalidationRes,
-                                      invalidate_by_alternate_key,
-                                      InvalidationDur);
+    telemetry_log_invalidation_result(
+        InvalidationRes,
+        invalidate_by_alternate_key,
+        InvalidationDur
+    );
 do_invalidate_by_alternate_key(AltKey, #{store := _} = Opts) ->
     do_invalidate_by_alternate_key([AltKey], Opts).
 
@@ -853,8 +919,10 @@ request_key({Method, Url, _Headers, Body}, Opts) ->
     UrlDigest = url_digest(Url, Opts),
     BodyDigest = crypto:hash(sha256, iolist_to_binary(Body)),
     BucketDigest = crypto:hash(sha256, erlang:term_to_binary(map_get(bucket, Opts))),
-    crypto:hash(sha256,
-                <<MethodDigest/binary, UrlDigest/binary, BodyDigest/binary, BucketDigest/binary>>).
+    crypto:hash(
+        sha256,
+        <<MethodDigest/binary, UrlDigest/binary, BodyDigest/binary, BucketDigest/binary>>
+    ).
 
 url_digest(Url, Opts) ->
     NormUrl = uri_string:normalize(Url),
@@ -874,7 +942,8 @@ normalize_query(_ParsedUrl, _Opts) ->
 
 normalize_headers(Headers, WhichHeaders) ->
     maps:merge(
-        maps:from_keys(WhichHeaders, undefined), normalize_headers(Headers, WhichHeaders, #{})).
+        maps:from_keys(WhichHeaders, undefined), normalize_headers(Headers, WhichHeaders, #{})
+    ).
 
 normalize_headers([], _WhichHeaders, NormHeaders) ->
     NormHeaders;
@@ -886,13 +955,17 @@ normalize_headers([{Name, Value} | Rest], WhichHeaders, NormHeaders) ->
             case NormHeaders of
                 #{NormName := AccumulatedValue} ->
                     NewValue = <<AccumulatedValue/binary, ", ", NormValue/binary>>,
-                    normalize_headers(Rest,
-                                      WhichHeaders,
-                                      maps:put(NormName, NewValue, NormHeaders));
+                    normalize_headers(
+                        Rest,
+                        WhichHeaders,
+                        maps:put(NormName, NewValue, NormHeaders)
+                    );
                 _ ->
-                    normalize_headers(Rest,
-                                      WhichHeaders,
-                                      maps:put(NormName, NormValue, NormHeaders))
+                    normalize_headers(
+                        Rest,
+                        WhichHeaders,
+                        maps:put(NormName, NormValue, NormHeaders)
+                    )
             end;
         false ->
             normalize_headers(Rest, WhichHeaders, NormHeaders)
@@ -900,7 +973,8 @@ normalize_headers([{Name, Value} | Rest], WhichHeaders, NormHeaders) ->
 
 normalize_header_name(HeaderName) ->
     string:lowercase(
-        string:trim(HeaderName, both, " ")).
+        string:trim(HeaderName, both, " ")
+    ).
 
 normalize_header_value(HeaderValue) ->
     string:trim(HeaderValue, both, " \t").
@@ -917,125 +991,164 @@ init_opts(#{store := Store} = Opts0) when is_atom(Store) ->
 init_opts(_Opts) ->
     erlang:error(no_store_configured).
 
-select_candidate(_ReqHeaders,
-                 _ParsedReqHeaders,
-                 [],
-                 SelectedCandidateOrUndefined,
-                 _Opts) ->
+select_candidate(
+    _ReqHeaders,
+    _ParsedReqHeaders,
+    [],
+    SelectedCandidateOrUndefined,
+    _Opts
+) ->
     SelectedCandidateOrUndefined;
 select_candidate(ReqHeaders, ParsedReqHeaders, [Candidate | Rest], undefined, Opts) ->
     case varying_headers_match(ReqHeaders, Candidate, Opts) of
         true ->
-            select_candidate(ReqHeaders,
-                             ParsedReqHeaders,
-                             Rest,
-                             {candidate_freshness(Candidate, ParsedReqHeaders, Opts), Candidate},
-                             Opts);
+            select_candidate(
+                ReqHeaders,
+                ParsedReqHeaders,
+                Rest,
+                {candidate_freshness(Candidate, ParsedReqHeaders, Opts), Candidate},
+                Opts
+            );
         false ->
             select_candidate(ReqHeaders, ParsedReqHeaders, Rest, undefined, Opts)
     end;
-select_candidate(ReqHeaders,
-                 ParsedReqHeaders,
-                 [Candidate | Rest],
-                 {SelectedFreshness, SelectedResp},
-                 Opts) ->
+select_candidate(
+    ReqHeaders,
+    ParsedReqHeaders,
+    [Candidate | Rest],
+    {SelectedFreshness, SelectedResp},
+    Opts
+) ->
     case varying_headers_match(ReqHeaders, Candidate, Opts) of
         true ->
             case {SelectedFreshness, candidate_freshness(Candidate, ParsedReqHeaders, Opts)} of
                 {Freshness, Freshness} ->
                     BestCandidate = freshest_candidate(SelectedResp, Candidate),
-                    select_candidate(ReqHeaders,
-                                     ParsedReqHeaders,
-                                     Rest,
-                                     {Freshness, BestCandidate},
-                                     Opts);
+                    select_candidate(
+                        ReqHeaders,
+                        ParsedReqHeaders,
+                        Rest,
+                        {Freshness, BestCandidate},
+                        Opts
+                    );
                 {fresh, _StaleOrMustRevalidate} ->
-                    select_candidate(ReqHeaders,
-                                     ParsedReqHeaders,
-                                     Rest,
-                                     {fresh, SelectedResp},
-                                     Opts);
+                    select_candidate(
+                        ReqHeaders,
+                        ParsedReqHeaders,
+                        Rest,
+                        {fresh, SelectedResp},
+                        Opts
+                    );
                 {_StaleOrMustRevalidate, fresh} ->
                     select_candidate(ReqHeaders, ParsedReqHeaders, Rest, {fresh, Candidate}, Opts);
                 {stale, must_revalidate} ->
-                    select_candidate(ReqHeaders,
-                                     ParsedReqHeaders,
-                                     Rest,
-                                     {stale, SelectedResp},
-                                     Opts);
+                    select_candidate(
+                        ReqHeaders,
+                        ParsedReqHeaders,
+                        Rest,
+                        {stale, SelectedResp},
+                        Opts
+                    );
                 {must_revalidate, stale} ->
                     select_candidate(ReqHeaders, ParsedReqHeaders, Rest, {stale, Candidate}, Opts)
             end;
         false ->
-            select_candidate(ReqHeaders,
-                             ParsedReqHeaders,
-                             Rest,
-                             {SelectedFreshness, SelectedResp},
-                             Opts)
+            select_candidate(
+                ReqHeaders,
+                ParsedReqHeaders,
+                Rest,
+                {SelectedFreshness, SelectedResp},
+                Opts
+            )
     end.
 
-varying_headers_match(ReqHeaders,
-                      {_Key, _Status, _Headers, RespVaryHeaders, RespMetadata},
-                      Opts) ->
+varying_headers_match(
+    ReqHeaders,
+    {_Key, _Status, _Headers, RespVaryHeaders, RespMetadata},
+    Opts
+) ->
     NormReqHeaders = normalize_headers(ReqHeaders, maps:keys(RespVaryHeaders)),
-    lists:all(fun({RespHeaderName, RespHeaderValue}) ->
-                 varying_header_match(NormReqHeaders,
-                                      RespHeaderName,
-                                      RespHeaderValue,
-                                      RespMetadata,
-                                      Opts)
-              end,
-              maps:to_list(RespVaryHeaders)).
+    lists:all(
+        fun({RespHeaderName, RespHeaderValue}) ->
+            varying_header_match(
+                NormReqHeaders,
+                RespHeaderName,
+                RespHeaderValue,
+                RespMetadata,
+                Opts
+            )
+        end,
+        maps:to_list(RespVaryHeaders)
+    ).
 
-varying_header_match(#{<<"accept-encoding">> := undefined},
-                     <<"accept-encoding">>,
-                     _RespHeaderValue,
-                     #{parsed_headers :=
-                           #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders},
-                     #{auto_decompress := true})
-    when is_list(ContentEncodings) andalso not ?has_strong_etag(ParsedRespHeaders) ->
-    not ?is_no_transform(ParsedRespHeaders)
-    andalso lists:last(ContentEncodings) == <<"gzip">>;
-varying_header_match(#{<<"accept-encoding">> := <<_/binary>> = AcceptEncoding},
-                     <<"accept-encoding">>,
-                     _RespHeaderValue,
-                     #{parsed_headers :=
-                           #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders},
-                     #{auto_accept_encoding := true} = Opts)
-    when is_list(ContentEncodings) andalso not ?is_no_transform(ParsedRespHeaders) ->
+varying_header_match(
+    #{<<"accept-encoding">> := undefined},
+    <<"accept-encoding">>,
+    _RespHeaderValue,
+    #{
+        parsed_headers :=
+            #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders
+    },
+    #{auto_decompress := true}
+) when
+    is_list(ContentEncodings) andalso not ?has_strong_etag(ParsedRespHeaders)
+->
+    not ?is_no_transform(ParsedRespHeaders) andalso
+        lists:last(ContentEncodings) == <<"gzip">>;
+varying_header_match(
+    #{<<"accept-encoding">> := <<_/binary>> = AcceptEncoding},
+    <<"accept-encoding">>,
+    _RespHeaderValue,
+    #{
+        parsed_headers :=
+            #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders
+    },
+    #{auto_accept_encoding := true} = Opts
+) when
+    is_list(ContentEncodings) andalso not ?is_no_transform(ParsedRespHeaders)
+->
     ContentEncoding = lists:last(ContentEncodings),
     AcceptedEncodings =
-        [Encoding
+        [
+            Encoding
          || {Encoding, Priority} <- cow_http_hd:parse_accept_encoding(AcceptEncoding),
-            Priority > 0],
-    lists:member(ContentEncoding, AcceptedEncodings)
-    orelse not ?has_strong_etag(ParsedRespHeaders)
-           andalso map_get(auto_decompress, Opts) == true;
-varying_header_match(NormReqHeaders,
-                     RespHeaderName,
-                     RespHeaderValue,
-                     _RespMetadata,
-                     _Opts) ->
+            Priority > 0
+        ],
+    lists:member(ContentEncoding, AcceptedEncodings) orelse
+        not ?has_strong_etag(ParsedRespHeaders) andalso
+            map_get(auto_decompress, Opts) == true;
+varying_header_match(
+    NormReqHeaders,
+    RespHeaderName,
+    RespHeaderValue,
+    _RespMetadata,
+    _Opts
+) ->
     maps:get(RespHeaderName, NormReqHeaders, undefined) == RespHeaderValue.
 
-freshest_candidate({_, _, _, _, #{created := CLCreated}} = CL,
-                   {_, _, _, _, #{created := CRCreated}} = _CR)
-    when CLCreated > CRCreated ->
+freshest_candidate(
+    {_, _, _, _, #{created := CLCreated}} = CL,
+    {_, _, _, _, #{created := CRCreated}} = _CR
+) when
+    CLCreated > CRCreated
+->
     CL;
 freshest_candidate(_CL, CR) ->
     CR.
 
-candidate_freshness({_, _, _, _, #{parsed_headers := ParsedRespHeaders}} = Candidate,
-                    ParsedReqHeaders,
-                    Opts) ->
+candidate_freshness(
+    {_, _, _, _, #{parsed_headers := ParsedRespHeaders}} = Candidate,
+    ParsedReqHeaders,
+    Opts
+) ->
     MustRevalidate =
-        not no_cache_satisfied(ParsedReqHeaders)
-        orelse not no_cache_satisfied(ParsedRespHeaders)
-        orelse not req_max_age_satisfied(Candidate, ParsedReqHeaders)
-        orelse not req_min_fresh_satisfied(Candidate, ParsedReqHeaders)
-        orelse not is_fresh(Candidate) andalso resp_must_revalidate(ParsedRespHeaders)
-        orelse not is_fresh(Candidate)
-               andalso resp_proxy_must_revalidate(ParsedRespHeaders, Opts),
+        not no_cache_satisfied(ParsedReqHeaders) orelse
+            not no_cache_satisfied(ParsedRespHeaders) orelse
+            not req_max_age_satisfied(Candidate, ParsedReqHeaders) orelse
+            not req_min_fresh_satisfied(Candidate, ParsedReqHeaders) orelse
+            not is_fresh(Candidate) andalso resp_must_revalidate(ParsedRespHeaders) orelse
+            not is_fresh(Candidate) andalso
+                resp_proxy_must_revalidate(ParsedRespHeaders, Opts),
 
     case MustRevalidate of
         true ->
@@ -1046,13 +1159,15 @@ candidate_freshness({_, _, _, _, #{parsed_headers := ParsedRespHeaders}} = Candi
                     fresh;
                 false ->
                     CanBeServedStale =
-                        req_max_stale_satisfied(Candidate, ParsedReqHeaders)
-                        orelse stale_if_error_satisfied(Candidate, ParsedReqHeaders, Opts)
-                        orelse stale_if_error_satisfied(Candidate, ParsedRespHeaders, Opts)
-                        orelse resp_stale_while_revalidate_satisfied(Candidate,
-                                                                     ParsedRespHeaders,
-                                                                     Opts)
-                               andalso not req_max_stale_rejected(Candidate, ParsedReqHeaders),
+                        req_max_stale_satisfied(Candidate, ParsedReqHeaders) orelse
+                            stale_if_error_satisfied(Candidate, ParsedReqHeaders, Opts) orelse
+                            stale_if_error_satisfied(Candidate, ParsedRespHeaders, Opts) orelse
+                            resp_stale_while_revalidate_satisfied(
+                                Candidate,
+                                ParsedRespHeaders,
+                                Opts
+                            ) andalso
+                                not req_max_stale_rejected(Candidate, ParsedReqHeaders),
 
                     case CanBeServedStale of
                         true ->
@@ -1084,19 +1199,27 @@ no_cache_satisfied(_) ->
 req_max_age_satisfied(Candidate, ParsedReqHeaders) ->
     req_max_age_satisfied(Candidate, ParsedReqHeaders, unix_now()).
 
-req_max_age_satisfied({_, _, _, _, #{created := Created}},
-                      #{<<"cache-control">> := #{<<"max-age">> := MaxAgeDur, <<"max-stale">> := _}},
-                      Now)
-    when Now - Created < MaxAgeDur ->
+req_max_age_satisfied(
+    {_, _, _, _, #{created := Created}},
+    #{<<"cache-control">> := #{<<"max-age">> := MaxAgeDur, <<"max-stale">> := _}},
+    Now
+) when
+    Now - Created < MaxAgeDur
+->
     true;
-req_max_age_satisfied({_, _, _, _, #{created := Created, expires := Expires}},
-                      #{<<"cache-control">> := #{<<"max-age">> := MaxAgeDur}},
-                      Now)
-    when Now - Created < MaxAgeDur andalso Now < Expires ->
+req_max_age_satisfied(
+    {_, _, _, _, #{created := Created, expires := Expires}},
+    #{<<"cache-control">> := #{<<"max-age">> := MaxAgeDur}},
+    Now
+) when
+    Now - Created < MaxAgeDur andalso Now < Expires
+->
     true;
-req_max_age_satisfied(_Candidate,
-                      #{<<"cache-control">> := #{<<"max-age">> := _MaxAgeDur}},
-                      _Now) ->
+req_max_age_satisfied(
+    _Candidate,
+    #{<<"cache-control">> := #{<<"max-age">> := _MaxAgeDur}},
+    _Now
+) ->
     false;
 req_max_age_satisfied(_Candidate, _ParsedReqHeaders, _Now) ->
     true.
@@ -1104,10 +1227,13 @@ req_max_age_satisfied(_Candidate, _ParsedReqHeaders, _Now) ->
 req_min_fresh_satisfied(Candidate, ParsedReqHeaders) ->
     req_min_fresh_satisfied(Candidate, ParsedReqHeaders, unix_now()).
 
-req_min_fresh_satisfied({_, _, _, _, #{expires := Expires}},
-                        #{<<"cache-control">> := #{<<"min-fresh">> := MinFreshDur}},
-                        Now)
-    when Expires - Now < MinFreshDur ->
+req_min_fresh_satisfied(
+    {_, _, _, _, #{expires := Expires}},
+    #{<<"cache-control">> := #{<<"min-fresh">> := MinFreshDur}},
+    Now
+) when
+    Expires - Now < MinFreshDur
+->
     false;
 req_min_fresh_satisfied(_, _, _) ->
     true.
@@ -1115,10 +1241,13 @@ req_min_fresh_satisfied(_, _, _) ->
 req_max_stale_satisfied(Candidate, ParsedReqHeaders) ->
     req_max_stale_satisfied(Candidate, ParsedReqHeaders, unix_now()).
 
-req_max_stale_satisfied({_, _, _, _, #{expires := Expires}},
-                        #{<<"cache-control">> := #{<<"max-stale">> := MaxStaleDur}},
-                        Now)
-    when is_integer(MaxStaleDur) andalso Now - Expires < MaxStaleDur ->
+req_max_stale_satisfied(
+    {_, _, _, _, #{expires := Expires}},
+    #{<<"cache-control">> := #{<<"max-stale">> := MaxStaleDur}},
+    Now
+) when
+    is_integer(MaxStaleDur) andalso Now - Expires < MaxStaleDur
+->
     true;
 req_max_stale_satisfied(_, _, _) ->
     false.
@@ -1126,11 +1255,14 @@ req_max_stale_satisfied(_, _, _) ->
 stale_if_error_satisfied(Candidate, ParsedHeaders, Opts) ->
     stale_if_error_satisfied(Candidate, ParsedHeaders, Opts, unix_now()).
 
-stale_if_error_satisfied({_, _, _, _, #{expires := Expires}},
-                         #{<<"cache-control">> := #{<<"stale-if-error">> := StaleIfErrorDur}},
-                         #{backend_in_error := true},
-                         Now)
-    when Now - Expires < StaleIfErrorDur ->
+stale_if_error_satisfied(
+    {_, _, _, _, #{expires := Expires}},
+    #{<<"cache-control">> := #{<<"stale-if-error">> := StaleIfErrorDur}},
+    #{backend_in_error := true},
+    Now
+) when
+    Now - Expires < StaleIfErrorDur
+->
     true;
 stale_if_error_satisfied(_, _, _, _) ->
     false.
@@ -1138,13 +1270,20 @@ stale_if_error_satisfied(_, _, _, _) ->
 resp_stale_while_revalidate_satisfied(Candidate, ParsedRespHeaders, Opts) ->
     resp_stale_while_revalidate_satisfied(Candidate, ParsedRespHeaders, Opts, unix_now()).
 
-resp_stale_while_revalidate_satisfied({_, _, _, _, #{expires := Expires}},
-                                      #{<<"cache-control">> :=
-                                            #{<<"stale-while-revalidate">> :=
-                                                  StaleWhileRevalidateDur}},
-                                      #{stale_while_revalidate_supported := true},
-                                      Now)
-    when Now - Expires < StaleWhileRevalidateDur ->
+resp_stale_while_revalidate_satisfied(
+    {_, _, _, _, #{expires := Expires}},
+    #{
+        <<"cache-control">> :=
+            #{
+                <<"stale-while-revalidate">> :=
+                    StaleWhileRevalidateDur
+            }
+    },
+    #{stale_while_revalidate_supported := true},
+    Now
+) when
+    Now - Expires < StaleWhileRevalidateDur
+->
     true;
 resp_stale_while_revalidate_satisfied(_, _, _, _) ->
     false.
@@ -1154,15 +1293,17 @@ resp_must_revalidate(#{<<"cache-control">> := #{<<"must-revalidate">> := _}}) ->
 resp_must_revalidate(_) ->
     false.
 
-resp_proxy_must_revalidate(#{<<"cache-control">> := #{<<"proxy-revalidate">> := _}},
-                           #{type := shared}) ->
+resp_proxy_must_revalidate(
+    #{<<"cache-control">> := #{<<"proxy-revalidate">> := _}},
+    #{type := shared}
+) ->
     true;
 resp_proxy_must_revalidate(_, _) ->
     false.
 
 req_max_stale_rejected(Candidate, ParsedReqHeaders) ->
-    has_cache_directive(<<"max-stale">>, ParsedReqHeaders)
-    andalso not req_max_stale_satisfied(Candidate, ParsedReqHeaders).
+    has_cache_directive(<<"max-stale">>, ParsedReqHeaders) andalso
+        not req_max_stale_satisfied(Candidate, ParsedReqHeaders).
 
 has_cache_directive(Directive, ParsedHeaders) ->
     case ParsedHeaders of
@@ -1203,29 +1344,38 @@ must_invalidate_request_uri({<<"HEAD">>, _, _, _}, _Response, _) ->
     false;
 must_invalidate_request_uri({<<"OPTIONS">>, _, _, _}, _Response, _) ->
     false;
-must_invalidate_request_uri({<<"POST">>, _, _, _},
-                            _Response,
-                            #{<<"cache-control">> := #{<<"s-maxage">> := _}}) ->
+must_invalidate_request_uri(
+    {<<"POST">>, _, _, _},
+    _Response,
+    #{<<"cache-control">> := #{<<"s-maxage">> := _}}
+) ->
     false;
-must_invalidate_request_uri({<<"POST">>, _, _, _},
-                            _Response,
-                            #{<<"cache-control">> := #{<<"max-age">> := _}}) ->
+must_invalidate_request_uri(
+    {<<"POST">>, _, _, _},
+    _Response,
+    #{<<"cache-control">> := #{<<"max-age">> := _}}
+) ->
     false;
 must_invalidate_request_uri({<<"POST">>, _, _, _}, _Response, #{<<"expires">> := _}) ->
     false;
-must_invalidate_request_uri(_Request, {Status, _, _}, _)
-    when Status >= 200 andalso Status =< 399 ->
+must_invalidate_request_uri(_Request, {Status, _, _}, _) when
+    Status >= 200 andalso Status =< 399
+->
     true;
 must_invalidate_request_uri(_Request, _Response, _) ->
     false.
 
-handle_invalidation_of_unsafe_method({_, Url, _, _},
-                                     [],
-                                     #{store := Store, store_opts := StoreOpts} = Opts) ->
+handle_invalidation_of_unsafe_method(
+    {_, Url, _, _},
+    [],
+    #{store := Store, store_opts := StoreOpts} = Opts
+) ->
     Store:invalidate_url(url_digest(Url, Opts), StoreOpts);
-handle_invalidation_of_unsafe_method(Request,
-                                     [{HeaderName, HeaderValue} | RestHeaders],
-                                     #{store := Store, store_opts := StoreOpts} = Opts) ->
+handle_invalidation_of_unsafe_method(
+    Request,
+    [{HeaderName, HeaderValue} | RestHeaders],
+    #{store := Store, store_opts := StoreOpts} = Opts
+) ->
     case ?LOWER(HeaderName) of
         <<"location">> ->
             Store:invalidate_url(url_digest(HeaderValue, Opts), StoreOpts);
@@ -1237,43 +1387,50 @@ handle_invalidation_of_unsafe_method(Request,
     handle_invalidation_of_unsafe_method(Request, RestHeaders, Opts).
 
 is_cacheable(Method, ParsedReqHeaders, Status, ParsedRespHeaders, Opts) ->
-    request_method_cacheable(Method, ParsedRespHeaders, Opts)
-    andalso response_status_is_final(Status)
-    andalso response_status_cacheable(Status, ParsedRespHeaders)
-    andalso not
-                is_map_key(<<"no-store">>, maps:get(<<"cache-control">>, ParsedReqHeaders, #{}))
-    andalso not
-                is_map_key(<<"no-store">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
-    andalso (cache_type(Opts) == private
-             orelse not
-                        is_map_key(<<"private">>,
-                                   maps:get(<<"cache-control">>, ParsedRespHeaders, #{})))
-    andalso (cache_type(Opts) == private
-             orelse not is_map_key(<<"authorization">>, ParsedReqHeaders)
-             orelse response_explicitely_cacheable(ParsedRespHeaders))
-    andalso (is_map_key(<<"public">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
-             orelse cache_type(Opts) == private
-                    andalso is_map_key(<<"private">>,
-                                       maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
-             orelse is_map_key(<<"expires">>, ParsedRespHeaders)
-             orelse is_map_key(<<"max-age">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
-             orelse cache_type(Opts) == shared
-                    andalso is_map_key(<<"s-maxage">>,
-                                       maps:get(<<"cache-control">>, ParsedRespHeaders, #{}))
-             orelse response_status_heuristically_cacheable(Status))
-    andalso maps:get(<<"vary">>, ParsedRespHeaders, undefined) /= <<"*">>.
+    request_method_cacheable(Method, ParsedRespHeaders, Opts) andalso
+        response_status_is_final(Status) andalso
+        response_status_cacheable(Status, ParsedRespHeaders) andalso
+        not is_map_key(<<"no-store">>, maps:get(<<"cache-control">>, ParsedReqHeaders, #{})) andalso
+        not is_map_key(<<"no-store">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{})) andalso
+        (cache_type(Opts) == private orelse
+            not is_map_key(
+                <<"private">>,
+                maps:get(<<"cache-control">>, ParsedRespHeaders, #{})
+            )) andalso
+        (cache_type(Opts) == private orelse
+            not is_map_key(<<"authorization">>, ParsedReqHeaders) orelse
+            response_explicitely_cacheable(ParsedRespHeaders)) andalso
+        (is_map_key(<<"public">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{})) orelse
+            cache_type(Opts) == private andalso
+                is_map_key(
+                    <<"private">>,
+                    maps:get(<<"cache-control">>, ParsedRespHeaders, #{})
+                ) orelse
+            is_map_key(<<"expires">>, ParsedRespHeaders) orelse
+            is_map_key(<<"max-age">>, maps:get(<<"cache-control">>, ParsedRespHeaders, #{})) orelse
+            cache_type(Opts) == shared andalso
+                is_map_key(
+                    <<"s-maxage">>,
+                    maps:get(<<"cache-control">>, ParsedRespHeaders, #{})
+                ) orelse
+            response_status_heuristically_cacheable(Status)) andalso
+        maps:get(<<"vary">>, ParsedRespHeaders, undefined) /= <<"*">>.
 
 request_method_cacheable(<<"GET">>, _, _) ->
     true;
 request_method_cacheable(<<"HEAD">>, _, _) ->
     true;
-request_method_cacheable(<<"POST">>,
-                         #{<<"cache-control">> := #{<<"s-maxage">> := _}},
-                         #{type := shared}) ->
+request_method_cacheable(
+    <<"POST">>,
+    #{<<"cache-control">> := #{<<"s-maxage">> := _}},
+    #{type := shared}
+) ->
     true;
-request_method_cacheable(<<"POST">>,
-                         #{<<"cache-control">> := #{<<"max-age">> := _}},
-                         _) ->
+request_method_cacheable(
+    <<"POST">>,
+    #{<<"cache-control">> := #{<<"max-age">> := _}},
+    _
+) ->
     true;
 request_method_cacheable(<<"POST">>, #{<<"expires">> := _}, _) ->
     true;
@@ -1289,8 +1446,10 @@ response_status_cacheable(206, _) ->
     false;
 response_status_cacheable(304, _) ->
     false;
-response_status_cacheable(Status,
-                          #{<<"cache-control">> := #{<<"must-understand">> := _}}) ->
+response_status_cacheable(
+    Status,
+    #{<<"cache-control">> := #{<<"must-understand">> := _}}
+) ->
     response_status_heuristically_cacheable(Status);
 response_status_cacheable(_, _) ->
     true.
@@ -1336,7 +1495,8 @@ vary_headers(ReqHeaders, #{<<"vary">> := HeaderList}) ->
     % even when a header does not appear in the request, it must be taken into account
     % according to the vary header
     maps:merge(
-        maps:from_keys(HeaderList, undefined), NormalizedHeaders);
+        maps:from_keys(HeaderList, undefined), NormalizedHeaders
+    );
 vary_headers(_ReqHeaders, _ParsedRespHeaders) ->
     #{}.
 
@@ -1365,15 +1525,19 @@ corrected_age_value(Age, _Opts) when is_integer(Age) ->
 corrected_age_value(_, _Opts) ->
     undefined.
 
-expires(CreatedAt,
-        _MaybeDate,
-        #{<<"cache-control">> := #{<<"s-maxage">> := SMaxAge}},
-        #{type := shared}) ->
+expires(
+    CreatedAt,
+    _MaybeDate,
+    #{<<"cache-control">> := #{<<"s-maxage">> := SMaxAge}},
+    #{type := shared}
+) ->
     {header, CreatedAt + SMaxAge};
-expires(CreatedAt,
-        _MaybeDate,
-        #{<<"cache-control">> := #{<<"max-age">> := MaxAge}},
-        _Opts) ->
+expires(
+    CreatedAt,
+    _MaybeDate,
+    #{<<"cache-control">> := #{<<"max-age">> := MaxAge}},
+    _Opts
+) ->
     {header, CreatedAt + MaxAge};
 expires(CreatedAt, Date, #{<<"expires">> := Expires}, _Opts) when is_integer(Date) ->
     {header, CreatedAt + Expires - Date};
@@ -1382,23 +1546,38 @@ expires(_CreatedAt, _MaybeDate, #{<<"expires">> := Expires}, _Opts) ->
 expires(CreatedAt, _MaybeDate, _ParsedRespHeaders, #{default_ttl := DefaultTTL}) ->
     {heuristics, CreatedAt + DefaultTTL}.
 
-grace(#{<<"cache-control">> :=
-            #{<<"stale-if-error">> := StaleIfErrorDur,
-              <<"stale-while-revalidate">> := StaleWhileRevalidateDur}},
-      Expires,
-      #{default_grace := Grace})
-    when StaleIfErrorDur > StaleWhileRevalidateDur andalso StaleIfErrorDur > Grace ->
+grace(
+    #{
+        <<"cache-control">> :=
+            #{
+                <<"stale-if-error">> := StaleIfErrorDur,
+                <<"stale-while-revalidate">> := StaleWhileRevalidateDur
+            }
+    },
+    Expires,
+    #{default_grace := Grace}
+) when
+    StaleIfErrorDur > StaleWhileRevalidateDur andalso StaleIfErrorDur > Grace
+->
     Expires + StaleIfErrorDur;
-grace(#{<<"cache-control">> :=
-            #{<<"stale-while-revalidate">> := StaleWhileRevalidateDur}},
-      Expires,
-      #{default_grace := Grace})
-    when StaleWhileRevalidateDur > Grace ->
+grace(
+    #{
+        <<"cache-control">> :=
+            #{<<"stale-while-revalidate">> := StaleWhileRevalidateDur}
+    },
+    Expires,
+    #{default_grace := Grace}
+) when
+    StaleWhileRevalidateDur > Grace
+->
     Expires + StaleWhileRevalidateDur;
-grace(#{<<"cache-control">> := #{<<"stale-if-error">> := StaleIfErrorDur}},
-      Expires,
-      #{default_grace := Grace})
-    when StaleIfErrorDur > Grace ->
+grace(
+    #{<<"cache-control">> := #{<<"stale-if-error">> := StaleIfErrorDur}},
+    Expires,
+    #{default_grace := Grace}
+) when
+    StaleIfErrorDur > Grace
+->
     Expires + StaleIfErrorDur;
 grace(_ParsedRespHeaders, Expires, #{default_grace := Grace}) ->
     Expires + Grace.
@@ -1424,19 +1603,27 @@ check_set_cookie([{HeaderName, _} | Rest], Opts) ->
 %% Internal functions related to compression
 %%====================================================================
 
-handle_auto_decompress(ParsedReqHeaders,
-                       {Status, RespHeaders0, BodyOrFile} = Response,
-                       #{parsed_headers :=
-                             #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders},
-                       #{auto_decompress := true})
-    when is_list(ContentEncodings) andalso not ?has_strong_etag(ParsedRespHeaders) ->
+handle_auto_decompress(
+    ParsedReqHeaders,
+    {Status, RespHeaders0, BodyOrFile} = Response,
+    #{
+        parsed_headers :=
+            #{<<"content-encoding">> := ContentEncodings} = ParsedRespHeaders
+    },
+    #{auto_decompress := true}
+) when
+    is_list(ContentEncodings) andalso not ?has_strong_etag(ParsedRespHeaders)
+->
     ContentEncoding = lists:last(ContentEncodings),
     AcceptedEncodings =
-        [AcceptedEncoding
-         || {AcceptedEncoding, Priority}
-                <- maps:to_list(
-                       maps:get(<<"accept-encoding">>, ParsedReqHeaders, #{})),
-            Priority > 0],
+        [
+            AcceptedEncoding
+         || {AcceptedEncoding, Priority} <-
+                maps:to_list(
+                    maps:get(<<"accept-encoding">>, ParsedReqHeaders, #{})
+                ),
+            Priority > 0
+        ],
     case lists:member(ContentEncoding, AcceptedEncodings) of
         true ->
             Response;
@@ -1467,70 +1654,91 @@ handle_auto_decompress(_ParsedReqHeaders, Response, _RespMetadata, _Opts) ->
 %% Internal functions related to range requests
 %%====================================================================
 
-handle_range_request(_Request,
-                     #{<<"cache-control">> := #{<<"no-transform">> := _}},
-                     Response,
-                     _RespMetadata,
-                     _Opts) ->
+handle_range_request(
+    _Request,
+    #{<<"cache-control">> := #{<<"no-transform">> := _}},
+    Response,
+    _RespMetadata,
+    _Opts
+) ->
     Response;
-handle_range_request(_Request,
-                     _ParsedReqHeaders,
-                     Response,
-                     #{parsed_headers := #{<<"cache-control">> := #{<<"no-transform">> := _}}},
-                     _Opts) ->
+handle_range_request(
+    _Request,
+    _ParsedReqHeaders,
+    Response,
+    #{parsed_headers := #{<<"cache-control">> := #{<<"no-transform">> := _}}},
+    _Opts
+) ->
     Response;
-handle_range_request({<<"GET">>, _, _, _},
-                     % cowlib parse empty bytes without raising
-                     #{<<"range">> := {bytes, []}},
-                     Response,
-                     _RespMetadata,
-                     _Opts) ->
+handle_range_request(
+    {<<"GET">>, _, _, _},
+    % cowlib parse empty bytes without raising
+    #{<<"range">> := {bytes, []}},
+    Response,
+    _RespMetadata,
+    _Opts
+) ->
     Response;
-handle_range_request({<<"GET">>, _, _, _},
-                     #{<<"range">> := {bytes, _}, <<"if-range">> := {EtagType, EtagVal}},
-                     Response,
-                     #{parsed_headers := #{<<"etag">> := {RespEtagType, RespEtagVal}}},
-                     _Opts)
-    when not
-             (EtagType == strong andalso RespEtagType == strong andalso EtagVal == RespEtagVal) ->
+handle_range_request(
+    {<<"GET">>, _, _, _},
+    #{<<"range">> := {bytes, _}, <<"if-range">> := {EtagType, EtagVal}},
+    Response,
+    #{parsed_headers := #{<<"etag">> := {RespEtagType, RespEtagVal}}},
+    _Opts
+) when
+    not (EtagType == strong andalso RespEtagType == strong andalso EtagVal == RespEtagVal)
+->
     Response;
-handle_range_request({<<"GET">>, _, _, _},
-                     #{<<"range">> := {bytes, _}, <<"if-range">> := {_EtagType, _EtagVal}},
-                     Response,
-                     #{parsed_headers := ParsedRespHeaders},
-                     _Opts)
-    when not is_map_key(<<"etag">>, ParsedRespHeaders) ->
+handle_range_request(
+    {<<"GET">>, _, _, _},
+    #{<<"range">> := {bytes, _}, <<"if-range">> := {_EtagType, _EtagVal}},
+    Response,
+    #{parsed_headers := ParsedRespHeaders},
+    _Opts
+) when
+    not is_map_key(<<"etag">>, ParsedRespHeaders)
+->
     Response;
-handle_range_request({<<"GET">>, _, _, _},
-                     #{<<"range">> := {bytes, _}, <<"if-range">> := IfUnmodifiedSince},
-                     Response,
-                     #{parsed_headers :=
-                           #{<<"last-modified">> := LastModified, <<"date">> := Date}},
-                     _Opts)
-    when is_integer(IfUnmodifiedSince)
-         andalso not (Date - LastModified >= 1 andalso LastModified =< IfUnmodifiedSince) ->
+handle_range_request(
+    {<<"GET">>, _, _, _},
+    #{<<"range">> := {bytes, _}, <<"if-range">> := IfUnmodifiedSince},
+    Response,
+    #{
+        parsed_headers :=
+            #{<<"last-modified">> := LastModified, <<"date">> := Date}
+    },
+    _Opts
+) when
+    is_integer(IfUnmodifiedSince) andalso
+        not (Date - LastModified >= 1 andalso LastModified =< IfUnmodifiedSince)
+->
     Response;
-handle_range_request({<<"GET">>, _, _, _},
-                     #{<<"range">> := {bytes, _}, <<"if-range">> := IfUnmodifiedSince},
-                     Response,
-                     #{parsed_headers := ParsedRespHeaders},
-                     _Opts)
-    when is_integer(IfUnmodifiedSince)
-         andalso not
-                     (is_map_key(<<"last-modified">>, ParsedRespHeaders)
-                      andalso is_map_key(<<"date">>, ParsedRespHeaders)) ->
+handle_range_request(
+    {<<"GET">>, _, _, _},
+    #{<<"range">> := {bytes, _}, <<"if-range">> := IfUnmodifiedSince},
+    Response,
+    #{parsed_headers := ParsedRespHeaders},
+    _Opts
+) when
+    is_integer(IfUnmodifiedSince) andalso
+        not (is_map_key(<<"last-modified">>, ParsedRespHeaders) andalso
+            is_map_key(<<"date">>, ParsedRespHeaders))
+->
     Response;
-handle_range_request({<<"GET">>, _, _, _},
-                     #{<<"range">> := {bytes, ByteRangeSpec}},
-                     Response,
-                     RespMetadata,
-                     #{max_ranges := MaxRanges}) ->
+handle_range_request(
+    {<<"GET">>, _, _, _},
+    #{<<"range">> := {bytes, ByteRangeSpec}},
+    Response,
+    RespMetadata,
+    #{max_ranges := MaxRanges}
+) ->
     BodySize = resp_body_byte_size(Response),
     NormByteRangeSpec = normalize_range_spec(ByteRangeSpec, BodySize),
-    if length(NormByteRangeSpec) < MaxRanges ->
-           build_range_response(NormByteRangeSpec, BodySize, Response, RespMetadata);
-       true ->
-           range_not_satisfiable_resp(BodySize)
+    if
+        length(NormByteRangeSpec) < MaxRanges ->
+            build_range_response(NormByteRangeSpec, BodySize, Response, RespMetadata);
+        true ->
+            range_not_satisfiable_resp(BodySize)
     end;
 handle_range_request(_Request, _ParsedReqHeaders, Response, _RespMetadata, _Opts) ->
     Response.
@@ -1550,52 +1758,66 @@ normalize_range_spec(RangeSpec, BodySize) ->
 
 normalize_range_spec([], _BodySize, Acc) ->
     lists:reverse(Acc);
-normalize_range_spec([{StartOffset, infinity} | Rest], BodySize, Acc)
-    when StartOffset + 1 > BodySize ->
+normalize_range_spec([{StartOffset, infinity} | Rest], BodySize, Acc) when
+    StartOffset + 1 > BodySize
+->
     normalize_range_spec(Rest, BodySize, Acc);
 normalize_range_spec([{StartOffset, infinity} | Rest], BodySize, Acc) ->
     normalize_range_spec(Rest, BodySize, [{StartOffset, BodySize - StartOffset} | Acc]);
-normalize_range_spec([{StartOffset, EndOffset} | Rest], BodySize, Acc)
-    when StartOffset > EndOffset ->
+normalize_range_spec([{StartOffset, EndOffset} | Rest], BodySize, Acc) when
+    StartOffset > EndOffset
+->
     normalize_range_spec([{EndOffset, StartOffset} | Rest], BodySize, Acc);
-normalize_range_spec([{_, EndOffset} | Rest], BodySize, Acc)
-    when EndOffset + 1 > BodySize ->
+normalize_range_spec([{_, EndOffset} | Rest], BodySize, Acc) when
+    EndOffset + 1 > BodySize
+->
     normalize_range_spec(Rest, BodySize, Acc);
 normalize_range_spec([{StartOffset, EndOffset} | Rest], BodySize, Acc) ->
     normalize_range_spec(Rest, BodySize, [{StartOffset, EndOffset - StartOffset + 1} | Acc]);
-normalize_range_spec([OffsetFromEnd | Rest], BodySize, Acc)
-    when abs(OffsetFromEnd) > BodySize ->
+normalize_range_spec([OffsetFromEnd | Rest], BodySize, Acc) when
+    abs(OffsetFromEnd) > BodySize
+->
     normalize_range_spec(Rest, BodySize, Acc);
 normalize_range_spec([OffsetFromEnd | Rest], BodySize, Acc) ->
-    normalize_range_spec(Rest,
-                         BodySize,
-                         [{BodySize - abs(OffsetFromEnd), abs(OffsetFromEnd)} | Acc]).
+    normalize_range_spec(
+        Rest,
+        BodySize,
+        [{BodySize - abs(OffsetFromEnd), abs(OffsetFromEnd)} | Acc]
+    ).
 
 build_range_response([], BodySize, _Response, _RespMetadata) ->
     range_not_satisfiable_resp(BodySize);
-build_range_response([{StartOffset, Length}],
-                     BodySize,
-                     {_Status, RespHeaders0, BodyOrFile},
-                     _RespMetadata) ->
+build_range_response(
+    [{StartOffset, Length}],
+    BodySize,
+    {_Status, RespHeaders0, BodyOrFile},
+    _RespMetadata
+) ->
     RespHeaders1 = delete_header(<<"content-length">>, RespHeaders0),
     RespHeaders2 =
-        set_header_value(<<"content-range">>,
-                         content_range(StartOffset, Length, BodySize),
-                         RespHeaders1),
+        set_header_value(
+            <<"content-range">>,
+            content_range(StartOffset, Length, BodySize),
+            RespHeaders1
+        ),
     RespHeaders3 =
-        set_header_value(<<"content-length">>,
-                         list_to_binary(integer_to_list(Length)),
-                         RespHeaders2),
+        set_header_value(
+            <<"content-length">>,
+            list_to_binary(integer_to_list(Length)),
+            RespHeaders2
+        ),
     case BodyOrFile of
         <<_/binary>> = BinBody ->
             {206, RespHeaders3, binary:part(BinBody, StartOffset, Length)};
         {file, FilePath} ->
             {206, RespHeaders3, {sendfile, StartOffset, Length, FilePath}}
     end;
-build_range_response(NormByteRangeSpec,
-                     BodySize,
-                     {_Status, RespHeaders, _Body} = Response,
-                     RespMetadata) ->
+build_range_response(
+    NormByteRangeSpec,
+    BodySize,
+    {_Status, RespHeaders, _Body} = Response,
+    RespMetadata
+) ->
     [{{FirstStartOffset, FirstLength}, FirstChunk} | OtherChunks] =
         get_range_chunks(NormByteRangeSpec, Response),
     PartBaseHeaders =
@@ -1607,20 +1829,35 @@ build_range_response(NormByteRangeSpec,
         end,
     Boundary = cow_multipart:boundary(),
     FirstPart =
-        [cow_multipart:first_part(Boundary,
-                                  [{<<"content-range">>,
-                                    content_range(FirstStartOffset, FirstLength, BodySize)}
-                                   | PartBaseHeaders]),
-         FirstChunk],
+        [
+            cow_multipart:first_part(
+                Boundary,
+                [
+                    {<<"content-range">>, content_range(FirstStartOffset, FirstLength, BodySize)}
+                    | PartBaseHeaders
+                ]
+            ),
+            FirstChunk
+        ],
     OtherParts =
-        [[cow_multipart:part(Boundary,
-                             [{<<"content-range">>, content_range(StartOffset, Length, BodySize)}
-                              | PartBaseHeaders]),
-          Chunk]
-         || {{StartOffset, Length}, Chunk} <- OtherChunks],
+        [
+            [
+                cow_multipart:part(
+                    Boundary,
+                    [
+                        {<<"content-range">>, content_range(StartOffset, Length, BodySize)}
+                        | PartBaseHeaders
+                    ]
+                ),
+                Chunk
+            ]
+         || {{StartOffset, Length}, Chunk} <- OtherChunks
+        ],
     RespHeadersMultipart =
-        [{<<"content-type">>, <<"multipart/byteranges; boundary=", Boundary/binary>>}
-         | delete_header(<<"content-type">>, RespHeaders)],
+        [
+            {<<"content-type">>, <<"multipart/byteranges; boundary=", Boundary/binary>>}
+            | delete_header(<<"content-type">>, RespHeaders)
+        ],
     Body = [FirstPart, OtherParts, cow_multipart:close(Boundary)],
     {206, RespHeadersMultipart, Body}.
 
@@ -1639,8 +1876,10 @@ get_range_chunks(NormByteRangeSpec, {_, _, {file, Filename}}) ->
             throw(resp_body_no_longer_available)
     end;
 get_range_chunks(NormByteRangeSpec, {_, _, Body}) ->
-    [{Range, binary:part(Body, StartOffset, Length)}
-     || {StartOffset, Length} = Range <- NormByteRangeSpec].
+    [
+        {Range, binary:part(Body, StartOffset, Length)}
+     || {StartOffset, Length} = Range <- NormByteRangeSpec
+    ].
 
 content_range(StartOffset, Length, BodySize) ->
     BodySizeBin = list_to_binary(integer_to_list(BodySize)),
@@ -1658,10 +1897,12 @@ range_not_satisfiable_resp(BodySize) ->
 
 handle_conditions(Request, #{<<"if-none-match">> := '*'}, Response, _RespMetadata) ->
     handle_failed_condition(Request, Response);
-handle_conditions(Request,
-                  #{<<"if-none-match">> := IfNoneMatch},
-                  Response,
-                  #{parsed_headers := #{<<"etag">> := {_StrongOrWeak, EtagVal}}}) ->
+handle_conditions(
+    Request,
+    #{<<"if-none-match">> := IfNoneMatch},
+    Response,
+    #{parsed_headers := #{<<"etag">> := {_StrongOrWeak, EtagVal}}}
+) ->
     {_, IfNoneMatchVals} = lists:unzip(IfNoneMatch),
     case lists:member(EtagVal, IfNoneMatchVals) of
         true ->
@@ -1671,40 +1912,56 @@ handle_conditions(Request,
     end;
 handle_conditions(_Request, #{<<"if-none-match">> := _}, Response, _RespMetadata) ->
     Response;
-handle_conditions(Request,
-                  #{<<"if-modified-since">> := IfModifiedSince},
-                  Response,
-                  #{parsed_headers := #{<<"last-modified">> := LastModified}})
-    when LastModified =< IfModifiedSince ->
+handle_conditions(
+    Request,
+    #{<<"if-modified-since">> := IfModifiedSince},
+    Response,
+    #{parsed_headers := #{<<"last-modified">> := LastModified}}
+) when
+    LastModified =< IfModifiedSince
+->
     handle_failed_condition(Request, Response);
-handle_conditions(Request,
-                  #{<<"if-modified-since">> := IfModifiedSince},
-                  Response,
-                  #{parsed_headers := #{<<"date">> := Date}})
-    when Date =< IfModifiedSince ->
+handle_conditions(
+    Request,
+    #{<<"if-modified-since">> := IfModifiedSince},
+    Response,
+    #{parsed_headers := #{<<"date">> := Date}}
+) when
+    Date =< IfModifiedSince
+->
     handle_failed_condition(Request, Response);
-handle_conditions(Request,
-                  #{<<"if-modified-since">> := IfModifiedSince},
-                  Response,
-                  #{created := Created})
-    when Created =< IfModifiedSince ->
+handle_conditions(
+    Request,
+    #{<<"if-modified-since">> := IfModifiedSince},
+    Response,
+    #{created := Created}
+) when
+    Created =< IfModifiedSince
+->
     handle_failed_condition(Request, Response);
 handle_conditions(_Request, _ParsedReqHeaders, Response, _RespMetadata) ->
     Response.
 
-handle_failed_condition({Method, _Url, _ReqHeaders, _ReqBody},
-                        {_Status, RespHeaders, _RespBody})
-    when Method == <<"HEAD">> orelse Method == <<"GET">> ->
+handle_failed_condition(
+    {Method, _Url, _ReqHeaders, _ReqBody},
+    {_Status, RespHeaders, _RespBody}
+) when
+    Method == <<"HEAD">> orelse Method == <<"GET">>
+->
     {304,
-     keep_headers(RespHeaders,
-                  [<<"cache-control">>,
-                   <<"content-location">>,
-                   <<"date">>,
-                   <<"etag">>,
-                   <<"expires">>,
-                   <<"vary">>,
-                   <<"last-modified">>]),
-     <<>>};
+        keep_headers(
+            RespHeaders,
+            [
+                <<"cache-control">>,
+                <<"content-location">>,
+                <<"date">>,
+                <<"etag">>,
+                <<"expires">>,
+                <<"vary">>,
+                <<"last-modified">>
+            ]
+        ),
+        <<>>};
 handle_failed_condition(_Request, _Response) ->
     {412, [], <<>>}.
 
@@ -1712,46 +1969,60 @@ handle_failed_condition(_Request, _Response) ->
 %% Internal functions related to response refresh
 %%====================================================================
 
-refresh_stored_responses(Request,
-                         {304, RespHeaders, _},
-                         #{store := Store, store_opts := StoreOpts} = Opts) ->
+refresh_stored_responses(
+    Request,
+    {304, RespHeaders, _},
+    #{store := Store, store_opts := StoreOpts} = Opts
+) ->
     RequestKey = request_key(Request, Opts),
     Candidates = Store:list_candidates(RequestKey, StoreOpts),
     ParsedRespHeaders = parse_headers(RespHeaders, [<<"etag">>, <<"last-modified">>]),
     CandidatesToUpdate = select_candidates_to_update(Candidates, ParsedRespHeaders),
     update_candidates(CandidatesToUpdate, Request, RespHeaders, update_headers, Opts);
-refresh_stored_responses({<<"HEAD">>, Url, ReqHeaders, ReqBody},
-                         {200, RespHeaders, _},
-                         #{store := Store, store_opts := StoreOpts} = Opts) ->
+refresh_stored_responses(
+    {<<"HEAD">>, Url, ReqHeaders, ReqBody},
+    {200, RespHeaders, _},
+    #{store := Store, store_opts := StoreOpts} = Opts
+) ->
     RequestKey = request_key({<<"GET">>, Url, ReqHeaders, ReqBody}, Opts),
     Candidates = Store:list_candidates(RequestKey, StoreOpts),
     ParsedRespHeaders =
         parse_headers(RespHeaders, [<<"etag">>, <<"last-modified">>, <<"content-length">>]),
     CandidatesToUpdate =
-        lists:filter(fun(Candidate) -> is_updatable_by_head_resp(Candidate, ParsedRespHeaders)
-                     end,
-                     Candidates),
+        lists:filter(
+            fun(Candidate) -> is_updatable_by_head_resp(Candidate, ParsedRespHeaders) end,
+            Candidates
+        ),
     CandidatesToInvalidate = Candidates -- CandidatesToUpdate,
     GetRequest = {<<"GET">>, Url, ReqHeaders, ReqBody},
     update_candidates(CandidatesToUpdate, GetRequest, RespHeaders, update_headers, Opts),
     update_candidates(CandidatesToInvalidate, GetRequest, RespHeaders, invalidate, Opts).
 
 select_candidates_to_update(Candidates, #{<<"etag">> := {strong, _} = ETag}) ->
-    lists:filter(fun ({_, _, _, _, #{parsed_headers := #{<<"etag">> := CandidateETag}}})
-                         when CandidateETag == ETag ->
-                         true;
-                     (_) ->
-                         false
-                 end,
-                 Candidates);
+    lists:filter(
+        fun
+            ({_, _, _, _, #{parsed_headers := #{<<"etag">> := CandidateETag}}}) when
+                CandidateETag == ETag
+            ->
+                true;
+            (_) ->
+                false
+        end,
+        Candidates
+    );
 select_candidates_to_update(Candidates, #{<<"etag">> := {weak, _} = ETag}) ->
-    case lists:filter(fun ({_, _, _, _, #{parsed_headers := #{<<"etag">> := CandidateETag}}})
-                              when CandidateETag == ETag ->
-                              true;
-                          (_) ->
-                              false
-                      end,
-                      Candidates)
+    case
+        lists:filter(
+            fun
+                ({_, _, _, _, #{parsed_headers := #{<<"etag">> := CandidateETag}}}) when
+                    CandidateETag == ETag
+                ->
+                    true;
+                (_) ->
+                    false
+            end,
+            Candidates
+        )
     of
         [] ->
             [];
@@ -1759,76 +2030,95 @@ select_candidates_to_update(Candidates, #{<<"etag">> := {weak, _} = ETag}) ->
             [most_recent_candidate(SelectedCandidates)]
     end;
 select_candidates_to_update(Candidates, #{<<"last-modified">> := LastModified}) ->
-    case lists:filter(fun ({_,
-                            _,
-                            _,
-                            _,
-                            #{parsed_headers := #{<<"last-modified">> := CandidateLastModified}}})
-                              when CandidateLastModified == LastModified ->
-                              true;
-                          (_) ->
-                              false
-                      end,
-                      Candidates)
+    case
+        lists:filter(
+            fun
+                (
+                    {_, _, _, _, #{
+                        parsed_headers := #{<<"last-modified">> := CandidateLastModified}
+                    }}
+                ) when
+                    CandidateLastModified == LastModified
+                ->
+                    true;
+                (_) ->
+                    false
+            end,
+            Candidates
+        )
     of
         [] ->
             [];
         SelectedCandidates ->
             [most_recent_candidate(SelectedCandidates)]
     end;
-select_candidates_to_update([{_, _, _, _, #{parsed_headers := ParsedHeaders}} =
-                                 Candidate],
-                            _)
-    when not
-             (is_map_key(<<"etag">>, ParsedHeaders)
-              orelse is_map_key(<<"last-modified">>, ParsedHeaders)) ->
+select_candidates_to_update(
+    [
+        {_, _, _, _, #{parsed_headers := ParsedHeaders}} =
+            Candidate
+    ],
+    _
+) when
+    not (is_map_key(<<"etag">>, ParsedHeaders) orelse
+        is_map_key(<<"last-modified">>, ParsedHeaders))
+->
     [Candidate];
 select_candidates_to_update(_, _) ->
     [].
 
 most_recent_candidate(Candidates) ->
-    element(2,
-            lists:max([{CreatedAt, Candidate}
-                       || {_, _, _, _, #{created := CreatedAt}} = Candidate <- Candidates])).
+    element(
+        2,
+        lists:max([
+            {CreatedAt, Candidate}
+         || {_, _, _, _, #{created := CreatedAt}} = Candidate <- Candidates
+        ])
+    ).
 
-is_updatable_by_head_resp({_,
-                           _,
-                           _,
-                           _,
-                           #{parsed_headers :=
-                                 #{<<"etag">> := Etag, <<"content-length">> := ContentLength}}},
-                          #{<<"etag">> := Etag, <<"content-length">> := ContentLength}) ->
+is_updatable_by_head_resp(
+    {_, _, _, _, #{
+        parsed_headers :=
+            #{<<"etag">> := Etag, <<"content-length">> := ContentLength}
+    }},
+    #{<<"etag">> := Etag, <<"content-length">> := ContentLength}
+) ->
     true;
-is_updatable_by_head_resp({_, _, _, _, #{parsed_headers := #{<<"etag">> := Etag}}},
-                          #{<<"etag">> := Etag}) ->
+is_updatable_by_head_resp(
+    {_, _, _, _, #{parsed_headers := #{<<"etag">> := Etag}}},
+    #{<<"etag">> := Etag}
+) ->
     true;
-is_updatable_by_head_resp({_,
-                           _,
-                           _,
-                           _,
-                           #{parsed_headers :=
-                                 #{<<"last-modified">> := LastModified,
-                                   <<"content-length">> := ContentLength}}},
-                          #{<<"last-modified">> := LastModified,
-                            <<"content-length">> := ContentLength}) ->
+is_updatable_by_head_resp(
+    {_, _, _, _, #{
+        parsed_headers :=
+            #{
+                <<"last-modified">> := LastModified,
+                <<"content-length">> := ContentLength
+            }
+    }},
+    #{
+        <<"last-modified">> := LastModified,
+        <<"content-length">> := ContentLength
+    }
+) ->
     true;
-is_updatable_by_head_resp({_,
-                           _,
-                           _,
-                           _,
-                           #{parsed_headers := #{<<"last-modified">> := LastModified}}},
-                          #{<<"last-modified">> := LastModified}) ->
+is_updatable_by_head_resp(
+    {_, _, _, _, #{parsed_headers := #{<<"last-modified">> := LastModified}}},
+    #{<<"last-modified">> := LastModified}
+) ->
     true;
 is_updatable_by_head_resp(_, _) ->
     false.
 
 update_candidates([], _Request, _RespHeaders, _Type, _Opts) ->
     ok;
-update_candidates([{RespRef, _, _, _, #{alternate_keys := AltKeys}} | Rest],
-                  Request,
-                  RespHeaders,
-                  Type,
-                  #{store := Store, store_opts := StoreOpts} = Opts) ->
+update_candidates(
+    [{RespRef, _, _, _, #{alternate_keys := AltKeys}} | Rest],
+    Request,
+    RespHeaders,
+    Type,
+    #{store := Store, store_opts := StoreOpts} = Opts
+) ->
     try
         {Status, StoredRespHeaders, BodyOrFile, _} = Store:get_response(RespRef, StoreOpts),
         RespBody = get_body_content(BodyOrFile),
@@ -1866,9 +2156,11 @@ parse_headers([{HeaderName, HeaderValue} | Rest], Which, Acc) ->
             ParsedValue = parse_header_value(LCHeaderName, HeaderValue),
             case {ParsedValue, maps:get(LCHeaderName, Acc, undefined)} of
                 {#{} = NewVal, #{} = CurrentVal} ->
-                    parse_headers(Rest,
-                                  Which,
-                                  maps:put(LCHeaderName, maps:merge(CurrentVal, NewVal), Acc));
+                    parse_headers(
+                        Rest,
+                        Which,
+                        maps:put(LCHeaderName, maps:merge(CurrentVal, NewVal), Acc)
+                    );
                 {[_ | _] = NewVal, [_ | _] = CurrentVal} ->
                     parse_headers(Rest, Which, maps:put(LCHeaderName, CurrentVal ++ NewVal, Acc));
                 {Val, _} when Val /= undefined ->
@@ -1901,15 +2193,19 @@ parse_header_value(HeaderName, HeaderValue) ->
             undefined
     end.
 
-post_process_header_parsing(HeaderName, ParsedValue)
-    when is_map_key(HeaderName, ?KV_HEADERS) ->
-    lists:foldl(fun ({Name, Val}, Acc) ->
-                        maps:put(Name, Val, Acc);
-                    (Name, Acc) ->
-                        maps:put(Name, undefined, Acc)
-                end,
-                #{},
-                ParsedValue);
+post_process_header_parsing(HeaderName, ParsedValue) when
+    is_map_key(HeaderName, ?KV_HEADERS)
+->
+    lists:foldl(
+        fun
+            ({Name, Val}, Acc) ->
+                maps:put(Name, Val, Acc);
+            (Name, Acc) ->
+                maps:put(Name, undefined, Acc)
+        end,
+        #{},
+        ParsedValue
+    );
 post_process_header_parsing(_, {{_, _, _}, {_, _, _}} = ErlangDateTime) ->
     calendar:datetime_to_gregorian_seconds(ErlangDateTime) - 62167219200;
 post_process_header_parsing(_, Val) ->
@@ -1925,9 +2221,9 @@ set_csl_header_value(TargetHeader, Value, [], Acc) ->
 set_csl_header_value(TargetHeader, Value, [{HeaderName, HeaderValue} | Rest], Acc) ->
     case ?LOWER(HeaderName) of
         TargetHeader ->
-            lists:reverse(Acc)
-            ++ [{HeaderName, <<HeaderValue/binary, ", ", Value/binary>>}]
-            ++ Rest;
+            lists:reverse(Acc) ++
+                [{HeaderName, <<HeaderValue/binary, ", ", Value/binary>>}] ++
+                Rest;
         _ ->
             set_csl_header_value(TargetHeader, Value, Rest, [{HeaderName, HeaderValue} | Acc])
     end.
@@ -1947,11 +2243,13 @@ keep_headers([{HeaderName, HeaderValue} | Rest], Which, Acc) ->
 
 update_headers(OldHeaders, NewHeaders) ->
     HeadersToUpdate = sets:from_list([?LOWER(HeaderName) || {HeaderName, _} <- NewHeaders]),
-    lists:filter(fun({HeaderName, _}) ->
-                    not sets:is_element(?LOWER(HeaderName), HeadersToUpdate)
-                 end,
-                 OldHeaders)
-    ++ NewHeaders.
+    lists:filter(
+        fun({HeaderName, _}) ->
+            not sets:is_element(?LOWER(HeaderName), HeadersToUpdate)
+        end,
+        OldHeaders
+    ) ++
+        NewHeaders.
 
 delete_header(ToDelete, Headers) ->
     delete_header(ToDelete, Headers, []).
@@ -1995,16 +2293,21 @@ get_body_content({file, FilePath}) ->
 get_body_content(<<_/binary>> = BinBody) ->
     BinBody.
 
-telemetry_log_invalidation_result({ok, NbInvalidation}, Type, InvalidationDur)
-    when is_integer(NbInvalidation) ->
-    telemetry:execute(?TELEMETRY_INVALIDATION_EVT,
-                      #{count => NbInvalidation, duration => InvalidationDur},
-                      #{type => Type}),
+telemetry_log_invalidation_result({ok, NbInvalidation}, Type, InvalidationDur) when
+    is_integer(NbInvalidation)
+->
+    telemetry:execute(
+        ?TELEMETRY_INVALIDATION_EVT,
+        #{count => NbInvalidation, duration => InvalidationDur},
+        #{type => Type}
+    ),
     {ok, NbInvalidation};
 telemetry_log_invalidation_result({ok, undefined}, Type, InvalidationDur) ->
-    telemetry:execute(?TELEMETRY_INVALIDATION_EVT,
-                      #{duration => InvalidationDur},
-                      #{type => Type}),
+    telemetry:execute(
+        ?TELEMETRY_INVALIDATION_EVT,
+        #{duration => InvalidationDur},
+        #{type => Type}
+    ),
     {ok, undefined};
 telemetry_log_invalidation_result({error, Reason}, Type, _InvlidationDur) ->
     telemetry_log_error(Reason, Type).
@@ -2035,16 +2338,20 @@ telemetry_start_measurement(Measurement) ->
             Map ->
                 Map
         end,
-    put({?TELEMETRY_PROCESS_TAG, measurements},
-        maps:put(Measurement, now_monotonic_us(), Measurements)).
+    put(
+        {?TELEMETRY_PROCESS_TAG, measurements},
+        maps:put(Measurement, now_monotonic_us(), Measurements)
+    ).
 
 telemetry_stop_measurement(Measurement) ->
     case get({?TELEMETRY_PROCESS_TAG, measurements}) of
         undefined ->
             ok;
         #{Measurement := StartValue} = Measurements ->
-            put({?TELEMETRY_PROCESS_TAG, measurements},
-                maps:put(Measurement, now_monotonic_us() - StartValue, Measurements))
+            put(
+                {?TELEMETRY_PROCESS_TAG, measurements},
+                maps:put(Measurement, now_monotonic_us() - StartValue, Measurements)
+            )
     end.
 
 telemetry_set_measurement(Measurement, Value) ->
