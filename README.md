@@ -66,6 +66,14 @@ miss
 
 ```
 
+## Related libraries
+
+`http_cache` is used by:
+- [`PlugHTTPCache`](https://github.com/tanguilp/plug_http_cache): an Elixir Plug library
+that caches HTTP responses (shared / server cache)
+- [`TeslaHTTPCache`](github.com/tanguilp/tesla_http_cache): an Elixir Tesla middleware
+that caches responses (private / client cache)
+
 ## Store backends
 
 Responses have to be stored in a separate store backend (this library being stateless), such as:
